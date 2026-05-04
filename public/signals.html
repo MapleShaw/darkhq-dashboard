@@ -3,173 +3,161 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📡 创意雷达 · 老巢控制台</title>
+<title>风声 · 老巢</title>
+<link rel="icon" href="/avatars/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="scanline"></div>
+<div class="app">
+  <aside class="rail" data-active="signals"></aside>
 
-<header class="hdr">
-  <div class="hdr-left">
-    <span class="hdr-icon">🏴‍☠️</span>
-    <div>
-      <h1 class="hdr-title">老巢控制台</h1>
-      <span class="hdr-sub">DARKNET OPERATIONS CENTER</span>
-    </div>
+  <div>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">老巢</h1>
+        <span class="topbar-sub">话事厅 · Darknet Operations</span>
+      </div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+    </header>
+
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">风声</h2>
+          <p class="page-desc">博客 / Twitter / 播客 三路风声汇总，可查旧账</p>
+        </div>
+        <button class="btn ghost sm" onclick="refresh()">↻ 更新</button>
+      </div>
+
+      <section class="stat-grid">
+        <div class="stat"><div class="stat-label">当日</div><div class="stat-value" id="sig-total">—</div><div class="stat-sub">条风声</div></div>
+        <div class="stat"><div class="stat-label">博客</div><div class="stat-value" id="sig-blog">—</div><div class="stat-sub">篇</div></div>
+        <div class="stat"><div class="stat-label">𝕏 推文</div><div class="stat-value" id="sig-x">—</div><div class="stat-sub">条</div></div>
+        <div class="stat"><div class="stat-label">播客</div><div class="stat-value" id="sig-podcast">—</div><div class="stat-sub">集</div></div>
+      </section>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="latest"  onclick="switchTab('latest',this)">今日风声</button>
+        <button class="tab"        data-tab="history" onclick="switchTab('history',this)">旧账 · 近 7 日</button>
+      </div>
+
+      <div id="tab-latest">
+        <div class="filters">
+          <button class="filter-btn active" data-src="all"     onclick="applyFilter('all',this)">全部</button>
+          <button class="filter-btn"        data-src="blog"    onclick="applyFilter('blog',this)">博客</button>
+          <button class="filter-btn"        data-src="x"       onclick="applyFilter('x',this)">Twitter</button>
+          <button class="filter-btn"        data-src="podcast" onclick="applyFilter('podcast',this)">播客</button>
+        </div>
+        <div class="signal-grid" id="signal-full"><div class="loading">探听中…</div></div>
+      </div>
+
+      <div id="tab-history" style="display:none">
+        <div id="history-timeline" class="timeline"><div class="loading">翻旧账中…</div></div>
+      </div>
+    </main>
   </div>
-  <div class="hdr-right">
-    <nav class="hdr-nav">
-      <a class="nav-link" href="/">⌂ 主页</a>
-      <a class="nav-link" href="/cron.html">⏰ 定时任务</a>
-      <a class="nav-link active" href="/signals.html">📡 创意雷达</a>
-      <a class="nav-link" href="/settings.html">⚙️ 设置</a>
-    </nav>
-    <div class="clock" id="clock"></div>
-  </div>
-</header>
+</div>
 
-<nav class="breadcrumb">
-  <a href="/">老巢控制台</a>
-  <span class="breadcrumb-sep">›</span>
-  <span class="breadcrumb-current">📡 创意雷达</span>
-</nav>
-
-<main class="layout">
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title"><span class="accent">◈</span> 创意雷达 · Signal Feed</h2>
-      <button class="refresh-btn" onclick="loadSignalsFull()">↺ 刷新</button>
-    </div>
-
-    <!-- stats -->
-    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
-      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
-        <div class="summary-label">总信号数</div>
-        <div class="summary-value" id="sig-total" style="font-size:1.4rem">—</div>
-      </div>
-      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
-        <div class="summary-label">Blog</div>
-        <div class="summary-value" id="sig-blog" style="font-size:1.4rem;color:#b07fff">—</div>
-      </div>
-      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
-        <div class="summary-label">𝕏 Twitter</div>
-        <div class="summary-value" id="sig-x" style="font-size:1.4rem;color:#ccc">—</div>
-      </div>
-      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
-        <div class="summary-label">Podcast</div>
-        <div class="summary-value" id="sig-podcast" style="font-size:1.4rem;color:#ffa500">—</div>
-      </div>
-    </div>
-
-    <!-- filters -->
-    <div class="signal-filters" id="signal-filters" style="margin-bottom:1.5rem">
-      <button class="filter-btn active" data-src="all"     onclick="applyFilter('all',this)">全部</button>
-      <button class="filter-btn" data-src="blog"    onclick="applyFilter('blog',this)">📰 Blog</button>
-      <button class="filter-btn" data-src="x"       onclick="applyFilter('x',this)">𝕏 Twitter</button>
-      <button class="filter-btn" data-src="podcast" onclick="applyFilter('podcast',this)">🎙 Podcast</button>
-    </div>
-
-    <div class="signal-feed-v2" id="signal-full-feed">
-      <div class="loading">扫描信号中...</div>
-    </div>
-  </section>
-</main>
-
-<footer class="footer">
-  <span>老巢控制台 · 仅限内部访问 · OpenClaw Dashboard v2.0</span>
-</footer>
-
+<script src="rail.js"></script>
 <script>
-// Clock
 function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
 setInterval(updateClock,1000);updateClock();
 
-function formatTime(iso){
-  if(!iso)return'—';
-  try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}
-}
-function escHtml(str){if(!str)return'';return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtTime(iso){if(!iso)return'—';try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}}
 
-function sourceTag(src, sourceName){
-  const tags={blog:['tag-blog','📰 BLOG'],x:['tag-x','𝕏'],podcast:['tag-podcast','🎙 PODCAST']};
-  const[cls,label]=tags[src]||['tag-default',src?.toUpperCase()||'FEED'];
-  return`<span class="signal-source-tag ${cls}">${label}: ${sourceName||''}</span>`;
+function signalCard(sig){
+  return `
+  <article class="signal-card">
+    <div class="signal-top">
+      <span class="signal-tag"><span class="tag-dot ${esc(sig.source)}"></span>${esc((sig.source||'').toUpperCase())} · ${esc(sig.sourceName)}</span>
+      <span class="signal-score">${sig.score||0}</span>
+    </div>
+    <h3 class="signal-title">
+      ${sig.url?`<a href="${esc(sig.url)}" target="_blank" rel="noopener">${esc(sig.title)}</a>`:esc(sig.title)}
+    </h3>
+    ${sig.summary?`<p class="signal-summary">${esc(sig.summary)}</p>`:''}
+    ${sig.reason?`<div class="signal-reason">${esc(sig.reason)}</div>`:''}
+    <div class="signal-meta"><span>${fmtTime(sig.publishedAt)}</span></div>
+  </article>`;
 }
 
 let allSignals=[];
 let currentFilter='all';
+let currentTab='latest';
 
-async function loadSignalsFull(){
-  const feed=document.getElementById('signal-full-feed');
-  feed.innerHTML='<div class="loading">扫描信号中...</div>';
+async function loadLatest(){
+  const grid=document.getElementById('signal-full');
+  grid.innerHTML='<div class="loading">探听中…</div>';
   try{
-    const res=await fetch('/api/signals');
-    const data=await res.json();
+    const data=await fetch('/api/signals').then(r=>r.json());
     allSignals=data.signals||[];
-
-    // Update stats
     document.getElementById('sig-total').textContent=allSignals.length;
     document.getElementById('sig-blog').textContent=allSignals.filter(s=>s.source==='blog').length;
     document.getElementById('sig-x').textContent=allSignals.filter(s=>s.source==='x').length;
     document.getElementById('sig-podcast').textContent=allSignals.filter(s=>s.source==='podcast').length;
-
-    renderSignals();
+    renderLatest();
   }catch(e){
-    feed.innerHTML=`<div class="empty-state"><span class="empty-icon">📡</span>加载失败：${e.message}</div>`;
+    grid.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
-function renderSignals(){
-  const feed=document.getElementById('signal-full-feed');
-  const filtered = currentFilter==='all' ? allSignals : allSignals.filter(s=>s.source===currentFilter);
-  if(filtered.length===0){
-    feed.innerHTML=`<div class="empty-state"><span class="empty-icon">📡</span>暂无信号</div>`;
-    return;
-  }
-  feed.innerHTML=filtered.map(sig=>{
-    const score=sig.score||0;
-    const pct=Math.min(100,score);
-    return`
-    <div class="signal-card-v2">
-      <div class="signal-card-v2-header">
-        ${sourceTag(sig.source,sig.sourceName)}
-        <span class="signal-score">🔥 ${score}</span>
-      </div>
-      <div class="signal-title" style="font-size:0.95rem;margin-bottom:0.5rem">
-        ${sig.url
-          ?`<a href="${escHtml(sig.url)}" target="_blank" rel="noopener">${escHtml(sig.title)}</a>`
-          :escHtml(sig.title)}
-      </div>
-      ${sig.summary?`<div class="signal-summary" style="-webkit-line-clamp:3">${escHtml(sig.summary)}</div>`:''}
-      ${sig.reason?`<div class="signal-reason">💡 ${escHtml(sig.reason)}</div>`:''}
-      <div class="signal-score-bar-wrap">
-        <span class="signal-score-num">${score}</span>
-        <div class="signal-score-bar">
-          <div class="signal-score-fill" style="width:${pct}%"></div>
-        </div>
-      </div>
-      <div class="signal-meta">${formatTime(sig.publishedAt)}</div>
-    </div>`;
-  }).join('');
-
-  // Animate score bars after render
-  requestAnimationFrame(()=>{
-    document.querySelectorAll('.signal-score-fill').forEach(el=>{
-      const w=el.style.width;
-      el.style.width='0%';
-      requestAnimationFrame(()=>{ el.style.width=w; });
-    });
-  });
+function renderLatest(){
+  const grid=document.getElementById('signal-full');
+  const list=currentFilter==='all'?allSignals:allSignals.filter(s=>s.source===currentFilter);
+  if(!list.length){grid.innerHTML='<div class="empty"><span class="empty-icon">📡</span>未探到风声</div>';return;}
+  grid.innerHTML=list.map(signalCard).join('');
 }
 
-function applyFilter(src, btn){
+function applyFilter(src,btn){
   currentFilter=src;
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  renderSignals();
+  renderLatest();
 }
 
-document.addEventListener('DOMContentLoaded', loadSignalsFull);
+async function loadHistory(){
+  const host=document.getElementById('history-timeline');
+  host.innerHTML='<div class="loading">翻旧账中…</div>';
+  try{
+    const data=await fetch('/api/signals/history?days=7').then(r=>r.json());
+    const days=data.days||[];
+    if(!days.length){
+      host.innerHTML='<div class="empty"><span class="empty-icon">📡</span>未有旧账</div>';
+      return;
+    }
+    host.innerHTML=days.map(day=>`
+      <section class="timeline-day">
+        <div class="timeline-date">${esc(day.date)}<span class="count">· ${day.signals.length} 条风声</span></div>
+        <div class="signal-grid">
+          ${(day.signals||[]).map(signalCard).join('')}
+        </div>
+      </section>`).join('');
+  }catch(e){
+    host.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
+  }
+}
+
+function switchTab(tab,btn){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-latest').style.display  = tab==='latest' ? '' : 'none';
+  document.getElementById('tab-history').style.display = tab==='history' ? '' : 'none';
+  if(tab==='history' && !document.getElementById('history-timeline').dataset.loaded){
+    loadHistory().then(()=>{document.getElementById('history-timeline').dataset.loaded='1';});
+  }
+}
+
+function refresh(){
+  if(currentTab==='latest') loadLatest();
+  else { document.getElementById('history-timeline').dataset.loaded=''; loadHistory().then(()=>{document.getElementById('history-timeline').dataset.loaded='1';}); }
+}
+
+document.addEventListener('DOMContentLoaded',loadLatest);
 </script>
 </body>
 </html>

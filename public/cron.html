@@ -3,190 +3,146 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⏰ 定时任务 · 老巢控制台</title>
+<title>日程 · 老巢</title>
+<link rel="icon" href="/avatars/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="scanline"></div>
+<div class="app">
+  <aside class="rail" data-active="cron"></aside>
 
-<header class="hdr">
-  <div class="hdr-left">
-    <span class="hdr-icon">🏴‍☠️</span>
-    <div>
-      <h1 class="hdr-title">老巢控制台</h1>
-      <span class="hdr-sub">DARKNET OPERATIONS CENTER</span>
-    </div>
+  <div>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">老巢</h1>
+        <span class="topbar-sub">话事厅 · Darknet Operations</span>
+      </div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+    </header>
+
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">日程</h2>
+          <p class="page-desc">例牌与定时差事的出勤记录</p>
+        </div>
+        <button class="btn ghost sm" onclick="loadCronFull()">↻ 更新</button>
+      </div>
+
+      <section class="stat-grid">
+        <div class="stat"><div class="stat-label">总数</div><div class="stat-value" id="cron-total">—</div><div class="stat-sub">条例牌</div></div>
+        <div class="stat"><div class="stat-label">在跑</div><div class="stat-value" id="cron-enabled">—</div><div class="stat-sub ok">运转中</div></div>
+        <div class="stat"><div class="stat-label">搞掂</div><div class="stat-value" id="cron-success">—</div><div class="stat-sub">上一轮</div></div>
+        <div class="stat"><div class="stat-label">失手</div><div class="stat-value" id="cron-failed">—</div><div class="stat-sub err">要跟进</div></div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">全部例牌 <span class="meta">点行展开睇近 10 次出勤</span></div>
+        <div class="cron-list" id="cron-full"><div class="loading">载入中…</div></div>
+      </section>
+    </main>
   </div>
-  <div class="hdr-right">
-    <nav class="hdr-nav">
-      <a class="nav-link" href="/">⌂ 主页</a>
-      <a class="nav-link active" href="/cron.html">⏰ 定时任务</a>
-      <a class="nav-link" href="/signals.html">📡 创意雷达</a>
-      <a class="nav-link" href="/settings.html">⚙️ 设置</a>
-    </nav>
-    <div class="clock" id="clock"></div>
-  </div>
-</header>
+</div>
 
-<nav class="breadcrumb">
-  <a href="/">老巢控制台</a>
-  <span class="breadcrumb-sep">›</span>
-  <span class="breadcrumb-current">⏰ 定时任务</span>
-</nav>
-
-<main class="layout">
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title"><span class="accent">◈</span> 定时任务 · Cron Jobs</h2>
-      <button class="refresh-btn" onclick="loadCronFull()">↺ 刷新</button>
-    </div>
-
-    <!-- stats row -->
-    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
-      <div class="summary-card" style="flex:1;min-width:140px;padding:0.8rem 1rem;">
-        <div class="summary-label">总任务数</div>
-        <div class="summary-value" id="cron-total" style="font-size:1.4rem">—</div>
-      </div>
-      <div class="summary-card" style="flex:1;min-width:140px;padding:0.8rem 1rem;">
-        <div class="summary-label">已启用</div>
-        <div class="summary-value" id="cron-enabled-count" style="font-size:1.4rem;color:var(--green)">—</div>
-      </div>
-      <div class="summary-card" style="flex:1;min-width:140px;padding:0.8rem 1rem;">
-        <div class="summary-label">最近成功</div>
-        <div class="summary-value" id="cron-success-count" style="font-size:1.4rem;color:var(--cyan)">—</div>
-      </div>
-    </div>
-
-    <div id="cron-full-list" style="display:flex;flex-direction:column;gap:0.7rem">
-      <div class="loading">载入中...</div>
-    </div>
-  </section>
-</main>
-
-<footer class="footer">
-  <span>老巢控制台 · 仅限内部访问 · OpenClaw Dashboard v2.0</span>
-</footer>
-
+<script src="rail.js"></script>
 <script>
-// Clock
 function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
 setInterval(updateClock,1000);updateClock();
 
-function formatTime(iso){
-  if(!iso)return'—';
-  try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}
-}
-function statusLabel(s){
-  const map={success:['✓ 成功','status-success'],ok:['✓ 成功','status-success'],failed:['✗ 失败','status-failed'],error:['✗ 失败','status-failed'],running:['⟳ 运行中','status-running'],unknown:['— 未知','status-unknown']};
-  return map[(s||'unknown').toLowerCase()]||['— 未知','status-unknown'];
-}
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtTime(iso){if(!iso)return'—';try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}}
+function fmtDur(ms){if(ms==null)return'—';if(ms<1000)return ms+'ms';return(ms/1000).toFixed(1)+'s';}
+function statusBadge(s){const key=(s||'unknown').toLowerCase();const map={success:['ok','搞掂'],ok:['ok','搞掂'],failed:['err','失手'],error:['err','失手'],running:['warn','开工中'],unknown:['dim','未知']};const[cls,label]=map[key]||['dim','未知'];return`<span class="badge ${cls}">${label}</span>`;}
+function runDotColor(st){return{success:'var(--ok)',ok:'var(--ok)',failed:'var(--err)',error:'var(--err)',running:'var(--warn)'}[st]||'var(--text-3)';}
 
-// Mock run history generator
-function mockRuns(job) {
-  const statuses = ['success','success','success','failed','unknown'];
-  const results = [];
-  for(let i=0;i<3;i++){
-    const st = statuses[Math.floor(Math.random()*statuses.length)];
-    const d  = new Date(Date.now() - (i+1)*24*3600*1000);
-    results.push({status:st, time:d.toISOString()});
-  }
-  return results;
-}
-
-function runDotColor(st){
-  return {success:'var(--green)',ok:'var(--green)',failed:'var(--red)',error:'var(--red)',running:'var(--cyan)'}[st]||'var(--text-dim)';
-}
+let jobsCache=[];
 
 async function loadCronFull(){
-  const list=document.getElementById('cron-full-list');
-  list.innerHTML='<div class="loading">载入中...</div>';
+  const list=document.getElementById('cron-full');
+  list.innerHTML='<div class="loading">载入中…</div>';
   try{
-    const res=await fetch('/api/cron');
-    const data=await res.json();
+    const data=await fetch('/api/cron').then(r=>r.json());
     const jobs=data.jobs||[];
+    jobsCache=jobs;
 
     document.getElementById('cron-total').textContent=jobs.length;
-    document.getElementById('cron-enabled-count').textContent=jobs.filter(j=>j.enabled!==false).length;
-    document.getElementById('cron-success-count').textContent=jobs.filter(j=>['success','ok'].includes((j.status||'').toLowerCase())).length;
+    document.getElementById('cron-enabled').textContent=jobs.filter(j=>j.enabled!==false).length;
+    document.getElementById('cron-success').textContent=jobs.filter(j=>['success','ok'].includes((j.status||'').toLowerCase())).length;
+    document.getElementById('cron-failed').textContent=jobs.filter(j=>['failed','error'].includes((j.status||'').toLowerCase())).length;
 
-    if(jobs.length===0){
-      list.innerHTML='<div class="empty-state"><span class="empty-icon">⏰</span>暂无任务</div>';
+    if(!jobs.length){
+      list.innerHTML='<div class="empty"><span class="empty-icon">⏰</span>冇例牌</div>';
       return;
     }
 
-    list.innerHTML = jobs.map((job,i)=>{
-      const [statusText,statusClass]=statusLabel(job.status);
-      const enabled=job.enabled!==false;
-      const runs=mockRuns(job);
-      // Build cron expression (mock)
-      const [h,m]=(job.schedule||'00:00').split(':');
-      const cronExpr=`${m} ${h} * * *`;
-      return `
-      <div class="cron-row-v2" id="cron-row-${i}" onclick="toggleCronRow(${i})">
-        <div class="cron-row-main">
-          <div class="cron-name" style="display:flex;align-items:center;gap:0.5rem">
-            <span style="font-size:1.1rem">${job.emoji||'⚙️'}</span>
-            <span style="font-family:var(--font-cn)">${job.name}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-            <span class="cron-status ${statusClass}">${statusText}</span>
-            <span class="cron-enabled-badge ${enabled?'badge-enabled':'badge-disabled'}">${enabled?'ENABLED':'DISABLED'}</span>
-          </div>
-          <div class="cron-time cron-row-time">
-            <span>${formatTime(job.lastRun)}</span>
-          </div>
-          <div class="cron-time cron-row-time">
-            <span class="next">▶ ${formatTime(job.nextRun)}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem">
-            <span style="font-size:0.7rem;color:var(--yellow);letter-spacing:1px">${job.schedule}</span>
-            <span class="cron-chevron">▶</span>
-          </div>
-        </div>
-        <div class="cron-row-detail" id="cron-detail-${i}">
-          <div class="cron-row-detail-inner">
-            <div class="cron-detail-meta">
-              <div class="cron-detail-field">
-                <label>任务 ID</label>
-                <code>${job.id||'—'}</code>
-              </div>
-              <div class="cron-detail-field">
-                <label>Cron 表达式</label>
-                <code>${cronExpr}</code>
-              </div>
-              <div class="cron-detail-field">
-                <label>状态</label>
-                <span>${enabled?'已启用':'已禁用'}</span>
-              </div>
-              <div class="cron-detail-field">
-                <label>下次运行</label>
-                <span>${formatTime(job.nextRun)}</span>
+    list.innerHTML=`
+      <div class="cron-head"><div>例牌</div><div>状态</div><div>上次</div><div>下次</div><div>时辰</div></div>
+      ${jobs.map((job,i)=>{
+        const[h,m]=(job.schedule||'00:00').split(':');
+        const cronExpr=`${m} ${h} * * *`;
+        return `
+        <div class="cron-row" id="cron-row-${i}" onclick="toggleRow(${i},'${esc(job.id)}')">
+          <div class="cron-name"><span class="emoji">${job.emoji||'⚙'}</span><span class="txt">${esc(job.name)}</span></div>
+          <div>${statusBadge(job.status)}</div>
+          <div class="cron-time">${fmtTime(job.lastRun)}</div>
+          <div class="cron-time next">${fmtTime(job.nextRun)}</div>
+          <div class="cron-schedule">${esc(job.schedule)}</div>
+          <div class="cron-row-detail">
+            <div class="cron-row-detail-inner">
+              <div class="detail-field"><label>例牌 ID</label><code>${esc(job.id||'—')}</code></div>
+              <div class="detail-field"><label>Cron 表达式</label><code>${cronExpr}</code></div>
+              <div class="detail-field"><label>负责兄弟</label><span>${esc(job.botId||'—')}</span></div>
+              <div class="detail-field"><label>是否在跑</label><span>${job.enabled!==false?'系':'否'}</span></div>
+              <div class="detail-field" style="grid-column:1/-1">
+                <label>近 10 次出勤</label>
+                <div class="run-history" id="run-history-${i}"><div class="loading">载入中…</div></div>
               </div>
             </div>
-            <div class="cron-run-history">
-              <div class="cron-run-history-title">最近 3 次运行记录</div>
-              ${runs.map(r=>`
-                <div class="run-item">
-                  <span class="run-dot" style="background:${runDotColor(r.status)}"></span>
-                  <span>${formatTime(r.time)}</span>
-                  <span style="color:${runDotColor(r.status)}">${r.status}</span>
-                </div>`).join('')}
-            </div>
           </div>
-        </div>
-      </div>`;
-    }).join('');
+        </div>`;
+      }).join('')}`;
   }catch(e){
-    list.innerHTML=`<div class="empty-state"><span class="empty-icon">⚠️</span>加载失败：${e.message}</div>`;
+    list.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
-function toggleCronRow(i){
+async function toggleRow(i, jobId){
   const row=document.getElementById('cron-row-'+i);
-  if(row) row.classList.toggle('open');
+  if(!row) return;
+  const willOpen=!row.classList.contains('open');
+  row.classList.toggle('open');
+  if(willOpen){
+    const host=document.getElementById('run-history-'+i);
+    if(host && host.dataset.loaded!=='1'){
+      try{
+        const data=await fetch(`/api/cron/${encodeURIComponent(jobId)}/runs`).then(r=>r.json());
+        const runs=data.runs||[];
+        if(!runs.length){
+          host.innerHTML='<div class="run-item"><span style="color:var(--text-3)">未有出勤记录</span></div>';
+        }else{
+          host.innerHTML=runs.map((r,ri)=>`
+            <details style="margin-bottom:0.35rem;border-bottom:1px dashed var(--line);padding-bottom:0.35rem">
+              <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:0.6rem">
+                <span class="run-dot" style="background:${runDotColor(r.status)}"></span>
+                <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-2)">${fmtTime(r.startedAt)}</span>
+                <span style="color:${runDotColor(r.status)};font-size:0.72rem">${esc(r.status)}</span>
+                <span style="color:var(--text-3);font-size:0.72rem;margin-left:auto">${fmtDur(r.durationMs)}</span>
+              </summary>
+              ${r.output?`<div class="run-item-output">${esc(r.output)}</div>`:''}
+            </details>`).join('');
+        }
+        host.dataset.loaded='1';
+      }catch(e){
+        host.innerHTML=`<div class="run-item" style="color:var(--err)">${esc(e.message)}</div>`;
+      }
+    }
+  }
 }
 
-document.addEventListener('DOMContentLoaded', loadCronFull);
+document.addEventListener('DOMContentLoaded',loadCronFull);
 </script>
 </body>
 </html>

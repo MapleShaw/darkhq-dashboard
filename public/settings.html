@@ -3,299 +3,186 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚙️ 设置 · 老巢控制台</title>
+<title>设置 · 老巢</title>
+<link rel="icon" href="/avatars/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="scanline"></div>
+<div class="app">
+  <aside class="rail" data-active="settings"></aside>
 
-<header class="hdr">
-  <div class="hdr-left">
-    <span class="hdr-icon">🏴‍☠️</span>
-    <div>
-      <h1 class="hdr-title">老巢控制台</h1>
-      <span class="hdr-sub">DARKNET OPERATIONS CENTER</span>
-    </div>
+  <div>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">老巢</h1>
+        <span class="topbar-sub">话事厅 · Darknet Operations</span>
+      </div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+    </header>
+
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">设置</h2>
+          <p class="page-desc">班底身份与 Token 用量配置</p>
+        </div>
+      </div>
+
+      <div class="main-grid">
+        <div class="main-col">
+
+          <section class="card">
+            <div class="card-title">
+              班底身份
+              <button class="btn primary sm" onclick="saveAllBots()">保存</button>
+            </div>
+            <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:1rem">
+              <div class="loading">载入中…</div>
+            </div>
+            <div id="bot-save-msg" style="margin-top:0.8rem;font-size:0.8rem;text-align:right;min-height:1.2rem"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-title">
+              Token 用量
+              <button class="btn ghost sm" onclick="loadUsage()">↻ 更新</button>
+            </div>
+            <div id="usage-panel"><div class="loading">载入中…</div></div>
+          </section>
+
+        </div>
+
+        <div class="side-col">
+          <section class="card">
+            <div class="card-title">系统</div>
+            <div class="info-list">
+              <div class="info-item"><span class="label">版本</span><span class="value">v3.2</span></div>
+              <div class="info-item"><span class="label">域名</span><span class="value"><a href="https://darkhq.indiehacker.fun" target="_blank">darkhq.indiehacker.fun</a></span></div>
+              <div class="info-item"><span class="label">证书到期</span><span class="value">2026-07-31</span></div>
+              <div class="info-item"><span class="label">线路</span><span class="value" id="gw-status-txt">—</span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
   </div>
-  <div class="hdr-right">
-    <nav class="hdr-nav">
-      <a class="nav-link" href="/">⌂ 主页</a>
-      <a class="nav-link" href="/cron.html">⏰ 定时任务</a>
-      <a class="nav-link" href="/signals.html">📡 创意雷达</a>
-      <a class="nav-link active" href="/settings.html">⚙️ 设置</a>
-    </nav>
-    <div class="clock" id="clock"></div>
-  </div>
-</header>
+</div>
 
-<nav class="breadcrumb">
-  <a href="/">老巢控制台</a>
-  <span class="breadcrumb-sep">›</span>
-  <span class="breadcrumb-current">⚙️ 设置</span>
-</nav>
-
-<main class="layout">
-
-  <!-- ── Bot 设置 ────────────────────────────────────── -->
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title"><span class="accent">◈</span> Bot 配置</h2>
-      <button class="refresh-btn" onclick="loadBots()">↺ 刷新</button>
-    </div>
-    <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:0.8rem">
-      <div class="loading">载入中...</div>
-    </div>
-    <div style="margin-top:1rem;display:flex;justify-content:flex-end">
-      <button class="refresh-btn" style="background:var(--accent);color:#000;font-weight:700;padding:0.5rem 1.4rem" onclick="saveAllBots()">💾 保存所有 Bot 设置</button>
-    </div>
-    <div id="bot-save-msg" style="margin-top:0.6rem;font-size:0.85rem;text-align:right;min-height:1.2rem"></div>
-  </section>
-
-  <!-- ── Token 用量 ──────────────────────────────────── -->
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title"><span class="accent">◈</span> Token 用量</h2>
-      <button class="refresh-btn" onclick="loadUsage()">↺ 刷新</button>
-    </div>
-    <div id="usage-panel">
-      <div class="loading">载入中...</div>
-    </div>
-  </section>
-
-  <!-- ── 系统信息 ─────────────────────────────────────── -->
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title"><span class="accent">◈</span> 系统信息</h2>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:0.6rem" id="sysinfo-panel">
-      <div class="cron-detail-field" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 0;border-bottom:1px solid var(--border)">
-        <label style="width:140px;color:var(--text-dim);font-size:0.85rem">Dashboard 版本</label>
-        <span style="color:var(--accent);font-weight:600">v3.0</span>
-      </div>
-      <div class="cron-detail-field" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 0;border-bottom:1px solid var(--border)">
-        <label style="width:140px;color:var(--text-dim);font-size:0.85rem">域名</label>
-        <a href="https://darkhq.indiehacker.fun" target="_blank" style="color:var(--cyan)">darkhq.indiehacker.fun</a>
-      </div>
-      <div class="cron-detail-field" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 0;border-bottom:1px solid var(--border)">
-        <label style="width:140px;color:var(--text-dim);font-size:0.85rem">证书到期日</label>
-        <span style="color:var(--yellow)">2026-07-31</span>
-      </div>
-      <div class="cron-detail-field" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 0">
-        <label style="width:140px;color:var(--text-dim);font-size:0.85rem">Gateway 状态</label>
-        <span id="gw-status-txt">检测中...</span>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<footer class="footer">
-  <span>老巢控制台 · 仅限内部访问 · OpenClaw Dashboard v3.0</span>
-</footer>
-
+<script src="rail.js"></script>
 <script>
-// Clock
 function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
 setInterval(updateClock,1000);updateClock();
 
-function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-const BOT_EMOJI = {main:'🏴‍☠️',content:'🧠',tech:'⌨️',intel:'🕵️',assistant:'🤝'};
+let botsData=[];
 
-// ── Bot 设置 ──────────────────────────────────────────────────────────────────
-let botsData = [];
+async function loadBots(){
+  const el=document.getElementById('bot-settings-list');
+  el.innerHTML='<div class="loading">载入中…</div>';
+  try{
+    const data=await fetch('/api/bots').then(r=>r.json());
+    botsData=data.bots||[];
 
-async function loadBots() {
-  const el = document.getElementById('bot-settings-list');
-  el.innerHTML = '<div class="loading">载入中...</div>';
-  try {
-    const res = await fetch('/api/bots');
-    const data = await res.json();
-    botsData = data.bots || [];
+    let saved={};
+    try{
+      const sr=await fetch('/bot-settings.json');
+      if(sr.ok){const sj=await sr.json();(sj.bots||[]).forEach(b=>{saved[b.id]=b;});}
+    }catch(e){}
 
-    // Try to load saved settings
-    let saved = {};
-    try {
-      const sr = await fetch('/bot-settings.json');
-      if (sr.ok) {
-        const sj = await sr.json();
-        (sj.bots || []).forEach(b => { saved[b.id] = b; });
-      }
-    } catch(e) {}
-
-    if (!botsData.length) {
-      el.innerHTML = '<div class="empty-state"><span class="empty-icon">🤖</span>暂无 Bot 数据</div>';
+    if(!botsData.length){
+      el.innerHTML='<div class="empty"><span class="empty-icon">🤖</span>暂无 Bot</div>';
       return;
     }
 
-    el.innerHTML = botsData.map(bot => {
-      const s = saved[bot.id] || {};
-      const name = s.name || bot.name;
-      const role = s.role || bot.role;
-      const avatarPath = `/avatars/${bot.id}.jpg`;
+    el.innerHTML=botsData.map(bot=>{
+      const s=saved[bot.id]||{};
+      const name=s.name||bot.name;
+      const role=s.role||bot.role;
+      const avatar=bot.avatarUrl||`/avatars/bot-${bot.id}.png`;
       return `
-      <div class="cron-row-v2" style="cursor:default" data-bot-id="${escHtml(bot.id)}">
-        <div class="cron-row-main" style="gap:0.8rem;flex-wrap:wrap;cursor:default">
-
-          <!-- Avatar -->
-          <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;min-width:56px">
-            <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;border:2px solid var(--border);background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:1.4rem" id="avatar-wrap-${escHtml(bot.id)}">
-              <img src="${avatarPath}" onerror="this.style.display='none';this.nextSibling.style.display='block'" style="width:100%;height:100%;object-fit:cover">
-              <span style="display:none">${BOT_EMOJI[bot.id]||'🤖'}</span>
-            </div>
-            <label style="font-size:0.65rem;color:var(--text-dim);cursor:pointer">
-              <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar('${escHtml(bot.id)}',this)">
-              📷 换头像
-            </label>
+      <div style="display:flex;gap:1rem;align-items:flex-start;padding:0.9rem;background:var(--bg-2);border-radius:var(--r-md)">
+        <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--bg-3);flex-shrink:0;border:1px solid var(--line)">
+          <img src="${esc(avatar)}" alt="${esc(bot.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:0.6rem;min-width:0">
+          <div>
+            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">显示名称</label>
+            <input type="text" class="input bot-name-input" data-id="${esc(bot.id)}" value="${esc(name)}">
           </div>
-
-          <!-- Name & Role -->
-          <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:0.4rem">
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <span style="color:var(--text-dim);font-size:0.8rem;width:60px">显示名称</span>
-              <input type="text" class="bot-name-input" data-id="${escHtml(bot.id)}" value="${escHtml(name)}"
-                style="background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.9rem;flex:1;font-family:var(--font-cn)">
-            </div>
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <span style="color:var(--text-dim);font-size:0.8rem;width:60px">角色描述</span>
-              <input type="text" class="bot-role-input" data-id="${escHtml(bot.id)}" value="${escHtml(role)}"
-                style="background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.9rem;flex:1;font-family:var(--font-cn)">
-            </div>
+          <div>
+            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">角色描述</label>
+            <input type="text" class="input bot-role-input" data-id="${esc(bot.id)}" value="${esc(role)}">
           </div>
-
-          <!-- Meta -->
-          <div style="display:flex;flex-direction:column;gap:0.25rem;min-width:150px">
-            <span style="font-size:0.75rem;color:var(--text-dim)">ID: <code>${escHtml(bot.id)}</code></span>
-            <span style="font-size:0.75rem;color:var(--text-dim)">模型: <span style="color:var(--cyan)">${escHtml(bot.model)}</span></span>
-            <span style="font-size:0.75rem" id="avatar-msg-${escHtml(bot.id)}"></span>
+          <div style="display:flex;gap:1rem;font-size:0.72rem;color:var(--text-3);font-family:var(--font-mono)">
+            <span>ID: ${esc(bot.id)}</span>
+            <span>模型: ${esc(bot.model)}</span>
           </div>
-
         </div>
       </div>`;
     }).join('');
 
-    // Update gateway status
-    const gwEl = document.getElementById('gw-status-txt');
-    if (gwEl) {
-      if (data.gatewayOnline) {
-        gwEl.innerHTML = '<span style="color:var(--green)">● 在线</span>';
-      } else {
-        gwEl.innerHTML = '<span style="color:var(--red)">● 离线</span>';
-      }
+    const gw=document.getElementById('gw-status-txt');
+    if(gw){
+      if(data.gatewayOnline) gw.innerHTML='<span style="color:var(--ok)">● 接通</span>';
+      else gw.innerHTML='<span style="color:var(--err)">● 断线</span>';
     }
-
-  } catch(e) {
-    el.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠️</span>加载失败：${escHtml(e.message)}</div>`;
+  }catch(e){
+    el.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
-async function uploadAvatar(botId, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const msgEl = document.getElementById('avatar-msg-' + botId);
-  if (msgEl) msgEl.innerHTML = '<span style="color:var(--yellow)">上传中...</span>';
-
-  const fd = new FormData();
-  fd.append('avatar', file);
-  try {
-    const res = await fetch(`/api/settings/avatar/${botId}`, { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.ok) {
-      // Refresh avatar
-      const wrap = document.getElementById('avatar-wrap-' + botId);
-      if (wrap) {
-        const img = wrap.querySelector('img');
-        if (img) { img.src = data.path + '?t=' + Date.now(); img.style.display = ''; }
-        const span = wrap.querySelector('span');
-        if (span) span.style.display = 'none';
-      }
-      if (msgEl) msgEl.innerHTML = '<span style="color:var(--green)">✓ 已更新</span>';
-    } else {
-      if (msgEl) msgEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(data.error||'失败')}</span>`;
-    }
-  } catch(e) {
-    if (msgEl) msgEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message)}</span>`;
-  }
-}
-
-async function saveAllBots() {
-  const msgEl = document.getElementById('bot-save-msg');
-  const bots = botsData.map(bot => {
-    const nameInput = document.querySelector(`.bot-name-input[data-id="${bot.id}"]`);
-    const roleInput = document.querySelector(`.bot-role-input[data-id="${bot.id}"]`);
-    return {
-      id: bot.id,
-      name: nameInput ? nameInput.value.trim() : bot.name,
-      role: roleInput ? roleInput.value.trim() : bot.role,
-    };
+async function saveAllBots(){
+  const msg=document.getElementById('bot-save-msg');
+  const bots=botsData.map(b=>{
+    const n=document.querySelector(`.bot-name-input[data-id="${b.id}"]`);
+    const r=document.querySelector(`.bot-role-input[data-id="${b.id}"]`);
+    return{id:b.id,name:n?n.value.trim():b.name,role:r?r.value.trim():b.role};
   });
-
-  try {
-    const res = await fetch('/api/settings/bots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bots }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      msgEl.innerHTML = '<span style="color:var(--green)">✓ 保存成功</span>';
-    } else {
-      msgEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(data.error||'保存失败')}</span>`;
-    }
-  } catch(e) {
-    msgEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message)}</span>`;
+  try{
+    const res=await fetch('/api/settings/bots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bots})});
+    const data=await res.json();
+    if(data.ok)msg.innerHTML='<span style="color:var(--ok)">✓ 保存成功</span>';
+    else msg.innerHTML=`<span style="color:var(--err)">✗ ${esc(data.error||'保存失败')}</span>`;
+  }catch(e){
+    msg.innerHTML=`<span style="color:var(--err)">✗ ${esc(e.message)}</span>`;
   }
-  setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
+  setTimeout(()=>{msg.innerHTML='';},3000);
 }
 
-// ── Token 用量 ────────────────────────────────────────────────────────────────
-function fmtNum(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
-  return String(n);
-}
+function fmtNum(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return String(n);}
 
-async function loadUsage() {
-  const el = document.getElementById('usage-panel');
-  el.innerHTML = '<div class="loading">载入中...</div>';
-  try {
-    const res = await fetch('/api/usage');
-    const data = await res.json();
-    const u = data.usage || {};
-    const models = u.models || [];
-
-    el.innerHTML = `
-      <div style="display:flex;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
-        <div class="summary-card" style="flex:1;min-width:140px;padding:0.8rem 1rem">
-          <div class="summary-label">总 Token 用量</div>
-          <div class="summary-value" style="font-size:1.6rem;color:var(--accent)">${fmtNum(u.totalTokens||0)}</div>
-        </div>
-        <div class="summary-card" style="flex:1;min-width:140px;padding:0.8rem 1rem">
-          <div class="summary-label">今日用量</div>
-          <div class="summary-value" style="font-size:1.6rem;color:var(--cyan)">${fmtNum(u.todayTokens||0)}</div>
-        </div>
+async function loadUsage(){
+  const el=document.getElementById('usage-panel');
+  el.innerHTML='<div class="loading">载入中…</div>';
+  try{
+    const data=await fetch('/api/usage').then(r=>r.json());
+    const u=data.usage||{};
+    const models=u.models||[];
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem">
+        <div><div class="stat-label">总用量</div><div class="stat-value" style="font-size:1.8rem">${fmtNum(u.totalTokens||0)}</div></div>
+        <div><div class="stat-label">今日</div><div class="stat-value" style="font-size:1.8rem;color:var(--accent-2)">${fmtNum(u.todayTokens||0)}</div></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:0.7rem">
-        ${models.map(m => `
+      <div style="display:flex;flex-direction:column;gap:0.8rem">
+        ${models.map(m=>`
           <div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;font-size:0.85rem">
-              <span style="color:var(--text)">${escHtml(m.model)}</span>
-              <span style="color:var(--text-dim)">${fmtNum(m.tokens)} (${m.pct}%)</span>
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem">
+              <span>${esc(m.model)}</span>
+              <span style="color:var(--text-3);font-family:var(--font-mono)">${fmtNum(m.tokens)} · ${m.pct}%</span>
             </div>
-            <div style="background:var(--bg-card);border-radius:4px;height:8px;overflow:hidden;border:1px solid var(--border)">
-              <div style="height:100%;width:${m.pct}%;background:var(--accent);border-radius:4px;transition:width 0.5s ease"></div>
-            </div>
+            <div class="progress"><div class="progress-fill" style="width:${m.pct}%"></div></div>
           </div>`).join('')}
       </div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠️</span>加载失败：${escHtml(e.message)}</div>`;
+  }catch(e){
+    el.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadBots();
-  loadUsage();
-});
+document.addEventListener('DOMContentLoaded',()=>{loadBots();loadUsage();});
 </script>
 </body>
 </html>

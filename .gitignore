@@ -1,1 +1,30 @@
+# dependencies
 node_modules/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dashboard 本地归档数据（由 server 运行时生成，不入库）
+data/
+
+# 可能的临时/备份
+*.bak
+*.tmp
+.vscode/
+.idea/
+
+# Env（如果以后加）
+.env
+.env.local
+
+# bot-settings.json 由用户编辑，归属于部署态数据，不跟随代码
+public/bot-settings.json
