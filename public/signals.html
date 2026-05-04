@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📡 创意雷达 · 老巢控制台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scanline"></div>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-icon">🏴‍☠️</span>
+    <div>
+      <h1 class="hdr-title">老巢控制台</h1>
+      <span class="hdr-sub">DARKNET OPERATIONS CENTER</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <nav class="hdr-nav">
+      <a class="nav-link" href="/">⌂ 主页</a>
+      <a class="nav-link" href="/cron.html">⏰ 定时任务</a>
+      <a class="nav-link active" href="/signals.html">📡 创意雷达</a>
+      <a class="nav-link" href="/settings.html">⚙️ 设置</a>
+    </nav>
+    <div class="clock" id="clock"></div>
+  </div>
+</header>
+
+<nav class="breadcrumb">
+  <a href="/">老巢控制台</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">📡 创意雷达</span>
+</nav>
+
+<main class="layout">
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title"><span class="accent">◈</span> 创意雷达 · Signal Feed</h2>
+      <button class="refresh-btn" onclick="loadSignalsFull()">↺ 刷新</button>
+    </div>
+
+    <!-- stats -->
+    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
+        <div class="summary-label">总信号数</div>
+        <div class="summary-value" id="sig-total" style="font-size:1.4rem">—</div>
+      </div>
+      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
+        <div class="summary-label">Blog</div>
+        <div class="summary-value" id="sig-blog" style="font-size:1.4rem;color:#b07fff">—</div>
+      </div>
+      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
+        <div class="summary-label">𝕏 Twitter</div>
+        <div class="summary-value" id="sig-x" style="font-size:1.4rem;color:#ccc">—</div>
+      </div>
+      <div class="summary-card" style="flex:1;min-width:120px;padding:0.8rem 1rem">
+        <div class="summary-label">Podcast</div>
+        <div class="summary-value" id="sig-podcast" style="font-size:1.4rem;color:#ffa500">—</div>
+      </div>
+    </div>
+
+    <!-- filters -->
+    <div class="signal-filters" id="signal-filters" style="margin-bottom:1.5rem">
+      <button class="filter-btn active" data-src="all"     onclick="applyFilter('all',this)">全部</button>
+      <button class="filter-btn" data-src="blog"    onclick="applyFilter('blog',this)">📰 Blog</button>
+      <button class="filter-btn" data-src="x"       onclick="applyFilter('x',this)">𝕏 Twitter</button>
+      <button class="filter-btn" data-src="podcast" onclick="applyFilter('podcast',this)">🎙 Podcast</button>
+    </div>
+
+    <div class="signal-feed-v2" id="signal-full-feed">
+      <div class="loading">扫描信号中...</div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>老巢控制台 · 仅限内部访问 · OpenClaw Dashboard v2.0</span>
+</footer>
+
+<script>
+// Clock
+function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
+setInterval(updateClock,1000);updateClock();
+
+function formatTime(iso){
+  if(!iso)return'—';
+  try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}
+}
+function escHtml(str){if(!str)return'';return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function sourceTag(src, sourceName){
+  const tags={blog:['tag-blog','📰 BLOG'],x:['tag-x','𝕏'],podcast:['tag-podcast','🎙 PODCAST']};
+  const[cls,label]=tags[src]||['tag-default',src?.toUpperCase()||'FEED'];
+  return`<span class="signal-source-tag ${cls}">${label}: ${sourceName||''}</span>`;
+}
+
+let allSignals=[];
+let currentFilter='all';
+
+async function loadSignalsFull(){
+  const feed=document.getElementById('signal-full-feed');
+  feed.innerHTML='<div class="loading">扫描信号中...</div>';
+  try{
+    const res=await fetch('/api/signals');
+    const data=await res.json();
+    allSignals=data.signals||[];
+
+    // Update stats
+    document.getElementById('sig-total').textContent=allSignals.length;
+    document.getElementById('sig-blog').textContent=allSignals.filter(s=>s.source==='blog').length;
+    document.getElementById('sig-x').textContent=allSignals.filter(s=>s.source==='x').length;
+    document.getElementById('sig-podcast').textContent=allSignals.filter(s=>s.source==='podcast').length;
+
+    renderSignals();
+  }catch(e){
+    feed.innerHTML=`<div class="empty-state"><span class="empty-icon">📡</span>加载失败：${e.message}</div>`;
+  }
+}
+
+function renderSignals(){
+  const feed=document.getElementById('signal-full-feed');
+  const filtered = currentFilter==='all' ? allSignals : allSignals.filter(s=>s.source===currentFilter);
+  if(filtered.length===0){
+    feed.innerHTML=`<div class="empty-state"><span class="empty-icon">📡</span>暂无信号</div>`;
+    return;
+  }
+  feed.innerHTML=filtered.map(sig=>{
+    const score=sig.score||0;
+    const pct=Math.min(100,score);
+    return`
+    <div class="signal-card-v2">
+      <div class="signal-card-v2-header">
+        ${sourceTag(sig.source,sig.sourceName)}
+        <span class="signal-score">🔥 ${score}</span>
+      </div>
+      <div class="signal-title" style="font-size:0.95rem;margin-bottom:0.5rem">
+        ${sig.url
+          ?`<a href="${escHtml(sig.url)}" target="_blank" rel="noopener">${escHtml(sig.title)}</a>`
+          :escHtml(sig.title)}
+      </div>
+      ${sig.summary?`<div class="signal-summary" style="-webkit-line-clamp:3">${escHtml(sig.summary)}</div>`:''}
+      ${sig.reason?`<div class="signal-reason">💡 ${escHtml(sig.reason)}</div>`:''}
+      <div class="signal-score-bar-wrap">
+        <span class="signal-score-num">${score}</span>
+        <div class="signal-score-bar">
+          <div class="signal-score-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="signal-meta">${formatTime(sig.publishedAt)}</div>
+    </div>`;
+  }).join('');
+
+  // Animate score bars after render
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.signal-score-fill').forEach(el=>{
+      const w=el.style.width;
+      el.style.width='0%';
+      requestAnimationFrame(()=>{ el.style.width=w; });
+    });
+  });
+}
+
+function applyFilter(src, btn){
+  currentFilter=src;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSignals();
+}
+
+document.addEventListener('DOMContentLoaded', loadSignalsFull);
+</script>
+</body>
+</html>

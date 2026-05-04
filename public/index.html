@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏴‍☠️ 老巢控制台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scanline"></div>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-icon">🏴‍☠️</span>
+    <div>
+      <h1 class="hdr-title">老巢控制台</h1>
+      <span class="hdr-sub">DARKNET OPERATIONS CENTER</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <nav class="hdr-nav">
+      <a class="nav-link active" href="/">⌂ 主页</a>
+      <a class="nav-link" href="/cron.html">⏰ 定时任务</a>
+      <a class="nav-link" href="/signals.html">📡 创意雷达</a>
+      <a class="nav-link" href="/settings.html">⚙️ 设置</a>
+    </nav>
+    <div class="status-pill" id="gateway-status">
+      <span class="dot dot-yellow"></span>
+      <span>连接中...</span>
+    </div>
+    <div class="clock" id="clock"></div>
+  </div>
+</header>
+
+<main class="layout">
+  <div class="layout-split">
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">SYS INFO</div>
+        <div class="sidebar-item"><span class="sidebar-label">Gateway</span><span id="gw-status-text">—</span></div>
+        <div class="sidebar-item"><span class="sidebar-label">Host</span><span id="sys-host">—</span></div>
+        <div class="sidebar-item"><span class="sidebar-label">Uptime</span><span id="sys-uptime">—</span></div>
+        <div class="sidebar-item"><span class="sidebar-label">Version</span><span class="sidebar-val-dim">v2.0</span></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">QUICK ACCESS</div>
+        <a class="sidebar-link" href="/cron.html">⏰ 定时任务</a>
+        <a class="sidebar-link" href="/signals.html">📡 创意雷达</a>
+        <a class="sidebar-link" href="/settings.html">⚙️ 设置</a>
+      </div>
+    </aside>
+    <!-- main content -->
+    <div class="main-content">
+<!-- ── Summary Bar ──────────────────────────────────── -->
+  <section class="section">
+    <div class="summary-bar" id="summary-bar">
+      <div class="summary-card">
+        <span class="summary-icon">🤖</span>
+        <div class="summary-label">总 Bot 数</div>
+        <div class="summary-value" id="sum-total">—</div>
+        <div class="summary-sub">agents deployed</div>
+      </div>
+      <div class="summary-card">
+        <span class="summary-icon">🟢</span>
+        <div class="summary-label">在线状态</div>
+        <div class="summary-value" id="sum-online">—</div>
+        <div class="summary-sub" id="sum-online-sub">checking...</div>
+      </div>
+      <div class="summary-card">
+        <span class="summary-icon">⏰</span>
+        <div class="summary-label">今日任务</div>
+        <div class="summary-value" id="sum-cron">—</div>
+        <div class="summary-sub">scheduled jobs</div>
+      </div>
+      <div class="summary-card">
+        <span class="summary-icon">📡</span>
+        <div class="summary-label">最近信号</div>
+        <div class="summary-value" id="sum-signal-score" style="font-size:1rem;padding-top:0.3rem">—</div>
+        <div class="summary-sub" id="sum-signal-time">loading...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Bot Fleet ─────────────────────────── -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title"><span class="accent">◈</span> 舰队状态 · Bot Fleet</h2>
+      <button class="refresh-btn" onclick="loadBots()">↺ 刷新</button>
+    </div>
+    <div class="bot-grid" id="bot-grid">
+      <div class="loading">载入中...</div>
+    </div>
+  </section>
+
+  <!-- ── Section: Cron Jobs (preview) ──────────────── -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title"><span class="accent">◈</span> 定时任务 · Cron Jobs</h2>
+      <button class="refresh-btn" onclick="loadCronPreview()">↺ 刷新</button>
+    </div>
+    <div class="cron-table" id="cron-preview">
+      <div class="loading">载入中...</div>
+    </div>
+    <a class="section-more-link" href="/cron.html">▶ 查看全部定时任务</a>
+  </section>
+
+  <!-- ── Section: Signal Feed (preview) ────────────── -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title"><span class="accent">◈</span> 创意雷达 · Signal Feed</h2>
+      <button class="refresh-btn" onclick="loadSignalPreview()">↺ 刷新</button>
+    </div>
+    <div class="signal-feed" id="signal-preview">
+      <div class="loading">扫描信号中...</div>
+    </div>
+    <a class="section-more-link" href="/signals.html">▶ 查看完整信号流</a>
+  </section>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <span>老巢控制台 · 仅限内部访问 · OpenClaw Dashboard v2.0</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
