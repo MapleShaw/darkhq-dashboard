@@ -152,12 +152,12 @@ app.get('/api/cron', async (req, res) => {
 
   const token = getGatewayToken();
   const cronDefs = [
-    { id: 'daily-log',     name: '每日会话自动日志',       schedule: '01:00', emoji: '📝', botId: 'assistant' },
-    { id: 'daily-brief',   name: '📊 每日简报',            schedule: '10:00', emoji: '📊', botId: 'main' },
+    { id: 'daily-log',     name: '每日会话自动日志',      schedule: '01:00', emoji: '📝', botId: 'assistant' },
+    { id: 'daily-brief',   name: '每日简报',               schedule: '10:00', emoji: '📊', botId: 'main' },
     { id: 'update-check',  name: 'OpenClaw 更新检查',      schedule: '10:00', emoji: '🔄', botId: 'tech' },
-    { id: 'signal-radar',  name: '📡 Content Signal Radar', schedule: '15:30', emoji: '📡', botId: 'intel' },
+    { id: 'signal-radar',  name: 'Content Signal Radar',  schedule: '15:30', emoji: '📡', botId: 'intel' },
     { id: 'soul-check',    name: '每日灵魂拷问',            schedule: '21:00', emoji: '🧠', botId: 'content' },
-    { id: 'daily-english', name: '🇺🇸 每日地道美语',        schedule: '21:10', emoji: '🇺🇸', botId: 'content' },
+    { id: 'daily-english', name: '每日地道美语',            schedule: '21:10', emoji: '🇺🇸', botId: 'content' },
   ];
 
   // 尝试从 gateway 获取
