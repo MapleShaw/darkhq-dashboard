@@ -39,6 +39,7 @@ const GATEWAY_URL  = process.env.GATEWAY_URL || 'http://localhost:18789';
 const DATA_DIR               = path.join(__dirname, 'data');
 const DATA_SIGNALS_ARCHIVE   = path.join(DATA_DIR, 'signals-archive');
 const DATA_CRON_RUNS         = path.join(DATA_DIR, 'cron-runs');
+const DATA_BOTS_STATUS       = path.join(DATA_DIR, 'bots-status.json');
 [DATA_DIR, DATA_SIGNALS_ARCHIVE, DATA_CRON_RUNS].forEach((d) => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
@@ -102,20 +103,47 @@ app.get('/api/bots', async (req, res) => {
     }
   } catch (e) {}
 
-  const result = bots.map((b) => ({
-    ...b,
-    avatarUrl: `/avatars/bot-${b.id}.png`,
-    online: gatewayOnline,
-    status: gatewayOnline ? 'online' : 'offline',
-    currentTask: null,                    // 线上：由 OpenClaw gateway 填入
-    lastTaskName: null,
-    lastTaskTime: null,
-    lastTaskStatus: 'unknown',
-    weekTasks: 0,
-    lastSeen: sessionMap[b.id] ? sessionMap[b.id] + ' (log)' : (gatewayOnline ? '活跃中' : '离线'),
-  }));
+  // 读 OpenClaw 推送过来的运行时状态（由 cron job 主动 POST /api/bots/status 写入）
+  const runtimeMap = {};
+  const runtimeData = safeReadJson(DATA_BOTS_STATUS, null);
+  if (runtimeData && Array.isArray(runtimeData.bots)) {
+    runtimeData.bots.forEach((b) => { runtimeMap[b.id] = b; });
+  }
+
+  const result = bots.map((b) => {
+    const rt = runtimeMap[b.id] || {};
+    return {
+      ...b,
+      avatarUrl: `/avatars/bot-${b.id}.png`,
+      online: gatewayOnline,
+      status: rt.status || (gatewayOnline ? 'online' : 'offline'),
+      currentTask: rt.currentTask || null,
+      lastTaskName: rt.lastTaskName || null,
+      lastTaskTime: rt.lastTaskTime || null,
+      lastTaskStatus: rt.lastTaskStatus || 'unknown',
+      weekTasks: rt.weekTasks || 0,
+      lastSeen: rt.lastSeen || (sessionMap[b.id] ? sessionMap[b.id] + ' (log)' : (gatewayOnline ? '活跃中' : '离线')),
+      statusUpdatedAt: runtimeData ? runtimeData.updatedAt : null,
+    };
+  });
 
   res.json({ ok: true, bots: result, gatewayOnline });
+});
+
+// ─── API: Bots Status（OpenClaw 主动推送，只写不读）────────
+app.post('/api/bots/status', (req, res) => {
+  const { bots: incoming } = req.body || {};
+  if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'bots array required' });
+  const record = {
+    updatedAt: new Date().toISOString(),
+    bots: incoming,
+  };
+  try {
+    fs.writeFileSync(DATA_BOTS_STATUS, JSON.stringify(record, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // ─── API: Cron Jobs ───────────────────────────────────────
