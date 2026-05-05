@@ -275,39 +275,34 @@ app.post('/api/cron/:jobId/runs', (req, res) => {
 //   2. 兜底 feed-{blogs,x,podcasts}.json（generate-feed.js 产出）
 //      - 只在"主源里这个 source 没数据"时补位
 //      - 例如主源只有 blog+x，podcast 就会从 feed-podcasts.json 读
-app.get('/api/signals', (req, res) => {
-  const source = req.query.source || 'all';
-  if (USE_MOCK) return res.json(mockData.mockSignals(source));
 
-  const all = [];                  // 全量信号，用于归档
-  const coveredBySources = new Set(); // 主源已覆盖的 source 集合
+// 抽成共用函数，方便 /api/signals 和 /api/signals/history 的"今日实时"复用
+function liveSignalsAll() {
+  const all = [];
+  const covered = new Set();
 
-  // ── 1) 主源 dashboard-signals.json ─────────────────────
-  try {
-    const dashData = safeReadJson(path.join(SIGNAL_DIR, 'dashboard-signals.json'), null);
-    if (dashData && Array.isArray(dashData.signals)) {
-      dashData.signals.forEach((item) => {
-        all.push({
-          id: item.id || item.url,
-          source: item.source,
-          sourceName: item.sourceName || item.handle || '',
-          title: item.title,
-          url: item.url,
-          summary: item.summary || '',
-          reason: item.reviewNote || (item.topic ? `[${item.topic}]` : '高信号内容'),
-          score: item.score || 70,
-          publishedAt: item.publishedAt || dashData.generatedAt,
-          generatedAt: dashData.generatedAt,
-          needsReview: item.needsReview || false,
-        });
-        if (item.source) coveredBySources.add(item.source);
+  const dashData = safeReadJson(path.join(SIGNAL_DIR, 'dashboard-signals.json'), null);
+  if (dashData && Array.isArray(dashData.signals)) {
+    dashData.signals.forEach((item) => {
+      all.push({
+        id: item.id || item.url,
+        source: item.source,
+        sourceName: item.sourceName || item.handle || '',
+        title: item.title,
+        url: item.url,
+        summary: item.summary || '',
+        reason: item.reviewNote || (item.topic ? `[${item.topic}]` : '高信号内容'),
+        score: item.score || 70,
+        publishedAt: item.publishedAt || dashData.generatedAt,
+        generatedAt: dashData.generatedAt,
+        needsReview: item.needsReview || false,
       });
-    }
-  } catch (e) {}
+      if (item.source) covered.add(item.source);
+    });
+  }
 
-  // ── 2) 兜底 feed-*.json（仅补主源未覆盖的 source）──────
   const readFallback = (src, fname, key, mapFn) => {
-    if (coveredBySources.has(src)) return;
+    if (covered.has(src)) return;
     const data = safeReadJson(path.join(SIGNAL_DIR, fname), null);
     if (!data || !Array.isArray(data[key])) return;
     data[key].forEach((item) => all.push(mapFn(item, data)));
@@ -337,8 +332,15 @@ app.get('/api/signals', (req, res) => {
     generatedAt: data.generatedAt,
   }));
 
-  // 排序（全量）
   all.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+  return all;
+}
+
+app.get('/api/signals', (req, res) => {
+  const source = req.query.source || 'all';
+  if (USE_MOCK) return res.json(mockData.mockSignals(source));
+
+  const all = liveSignalsAll();
 
   // ── 归档用全量（不被 source 过滤影响）──────────────────
   if (all.length) {
@@ -355,7 +357,10 @@ app.get('/api/signals', (req, res) => {
 });
 
 // ─── API: Signals 历史归档 ────────────────────────────────
-app.get('/api/signals/history', (req, res) => {
+// 从 data/signals-archive/*.json 读近 N 天。
+// 兼容历史脏数据：按 id 去重一次（旧版本双读 bug 可能导致重复入库）。
+// 今日实时：尝试调自身 /api/signals 拿"今日最新快照"作为第一天，这样"今日"不必依赖当天是否被访问过。
+app.get('/api/signals/history', async (req, res) => {
   const days = Math.min(Number(req.query.days) || 7, 30);
   if (USE_MOCK) return res.json(mockData.mockSignalsHistory(days));
 
@@ -363,9 +368,39 @@ app.get('/api/signals/history', (req, res) => {
     const files = fs.readdirSync(DATA_SIGNALS_ARCHIVE)
       .filter((f) => f.endsWith('.json'))
       .sort()
-      .reverse()
-      .slice(0, days);
-    const list = files.map((f) => safeReadJson(path.join(DATA_SIGNALS_ARCHIVE, f))).filter(Boolean);
+      .reverse();
+
+    const byDate = new Map();
+    for (const f of files) {
+      const data = safeReadJson(path.join(DATA_SIGNALS_ARCHIVE, f));
+      if (!data || !Array.isArray(data.signals)) continue;
+      // 按 id 去重（防御旧脏数据）
+      const seen = new Set();
+      const uniq = data.signals.filter((s) => {
+        const k = s.id || s.url || s.title;
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      byDate.set(data.date || f.replace('.json', ''), uniq);
+    }
+
+    // 今日实时拼进去（如果归档里没有今天或今天条数少于最新）
+    const today = todayKey();
+    try {
+      const live = await liveSignalsAll();
+      if (live.length) {
+        const existing = byDate.get(today) || [];
+        // 取最多的那一份作为今日
+        byDate.set(today, live.length >= existing.length ? live : existing);
+      }
+    } catch (e) {}
+
+    const list = [...byDate.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, days)
+      .map(([date, signals]) => ({ date, signals }));
+
     res.json({ ok: true, days: list });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
@@ -373,34 +408,32 @@ app.get('/api/signals/history', (req, res) => {
 });
 
 // ─── API: Usage ───────────────────────────────────────────
+// 尝试调 OpenClaw gateway 的 /api/usage；gateway 未实现或调不通时，
+// 返回 { ok: true, notConnected: true, reason: '...' }，前端据此显示"未对接"
+// 而不是假数据（以前的硬编码 fallback 会误导用户）
 app.get('/api/usage', async (req, res) => {
   if (USE_MOCK) return res.json(mockData.mockUsage());
 
-  const fallback = {
-    ok: true,
-    usage: {
-      totalTokens: 284500, todayTokens: 12300,
-      models: [
-        { model: 'Claude Opus 4.6',   tokens: 142000, pct: 50 },
-        { model: 'Claude Sonnet 4.6', tokens: 85350,  pct: 30 },
-        { model: 'Ling 2.6 1T',       tokens: 57150,  pct: 20 },
-      ],
-    },
-  };
-
   const token = getGatewayToken();
-  if (token) {
-    try {
-      const r = await fetch(`${GATEWAY_URL}/api/usage`, {
-        headers: { Authorization: `Bearer ${token}` }, timeout: 2000,
-      });
-      if (r.ok) {
-        const j = await r.json();
-        if (j && (j.usage || j.totalTokens)) return res.json({ ok: true, usage: j.usage || j });
-      }
-    } catch (e) {}
+  if (!token) {
+    return res.json({ ok: true, notConnected: true, reason: 'gateway token 不可用（检查 openclaw.json）' });
   }
-  res.json(fallback);
+  try {
+    const r = await fetch(`${GATEWAY_URL}/api/usage`, {
+      headers: { Authorization: `Bearer ${token}` }, timeout: 2000,
+    });
+    if (!r.ok) {
+      return res.json({ ok: true, notConnected: true, reason: `gateway 返回 ${r.status}（未实现 /api/usage ?）` });
+    }
+    const j = await r.json();
+    const usage = j.usage || j;
+    if (!usage || (usage.totalTokens == null && !Array.isArray(usage.models))) {
+      return res.json({ ok: true, notConnected: true, reason: 'gateway 返回格式不符（见 PROJECT.md §7.6）' });
+    }
+    return res.json({ ok: true, usage });
+  } catch (e) {
+    return res.json({ ok: true, notConnected: true, reason: `gateway 连接失败：${e.message}` });
+  }
 });
 
 // ─── API: Docs ────────────────────────────────────────────

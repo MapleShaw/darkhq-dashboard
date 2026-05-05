@@ -451,7 +451,11 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 .cron-row.open .cron-row-detail { max-height: 600px; }
 .cron-row-detail-inner {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;
-  padding: 0.8rem 0 0.4rem;
+  padding: 0.9rem 0.9rem 0.6rem 1.6rem;
+  margin-top: 0.3rem;
+  border-left: 2px solid var(--accent-soft);
+  background: rgba(255,255,255,0.015);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 .detail-field label {
   display: block; font-size: 0.68rem;

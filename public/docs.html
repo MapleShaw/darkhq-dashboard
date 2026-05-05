@@ -161,11 +161,11 @@ async function openDoc(id, el){
   if(el) el.classList.add('active');
 
   const viewer=document.getElementById('doc-viewer');
-  viewer.innerHTML='<div class="loading">载入文档…</div>';
+  viewer.innerHTML='<div class="loading">翻开中…</div>';
   try{
     const data=await fetch(`/api/docs/${encodeURIComponent(id)}`).then(r=>r.json());
     if(!data.ok){
-      viewer.innerHTML=`<div class="doc-viewer-empty">${esc(data.error||'文档读取失败')}</div>`;
+      viewer.innerHTML=`<div class="doc-viewer-empty">${esc(data.error||'卷宗打不开')}</div>`;
       return;
     }
     // 找到当前文档元信息
@@ -175,6 +175,28 @@ async function openDoc(id, el){
     const metaTxt=metaEl?metaEl.textContent.trim():'';
     const botEl=document.querySelector(`.doc-item.active .doc-item-bot`);
     const botTxt=botEl?botEl.textContent.trim():'';
+
+    // 大文件保护：避免 markdown 正则在大文本上回溯爆炸导致页面假死
+    const body = data.body || '';
+    const LIMIT_HARD = 500 * 1024;  // 超过就截断
+    const LIMIT_SOFT = 150 * 1024;  // 超过就禁用 markdown 渲染
+    let warn = '';
+    let bodyHtml = '';
+
+    if (body.length > LIMIT_HARD) {
+      const truncated = body.slice(0, 300 * 1024);
+      warn = `<div style="margin-bottom:1rem;padding:0.7rem 0.9rem;background:rgba(242,185,75,0.1);border-left:2px solid var(--warn);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:0.8rem;color:var(--warn)">
+        ⚠ 文件过大（${(body.length/1024).toFixed(0)} KB），已截断到前 300 KB 显示；Markdown 渲染已关闭以防卡顿。完整原文需到服务器文件系统查看。
+      </div>`;
+      bodyHtml = `<pre style="white-space:pre-wrap;font-family:var(--font-mono);font-size:0.82rem;line-height:1.6;color:var(--text);">${esc(truncated)}</pre>`;
+    } else if (body.length > LIMIT_SOFT) {
+      warn = `<div style="margin-bottom:1rem;padding:0.7rem 0.9rem;background:rgba(242,185,75,0.08);border-left:2px solid var(--warn);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:0.78rem;color:var(--warn)">
+        ⚠ 文件较大（${(body.length/1024).toFixed(0)} KB），为避免卡顿已切换到纯文本模式。建议把这类累积型文档按主题或日期切分（单文件建议 &lt; 50 KB）。
+      </div>`;
+      bodyHtml = `<pre style="white-space:pre-wrap;font-family:var(--font-mono);font-size:0.82rem;line-height:1.6;color:var(--text);">${esc(body)}</pre>`;
+    } else {
+      bodyHtml = renderMarkdown(body);
+    }
 
     viewer.innerHTML=`
       <div class="doc-viewer-header">
@@ -186,7 +208,8 @@ async function openDoc(id, el){
           </div>
         </div>
       </div>
-      <div class="doc-viewer-body">${renderMarkdown(data.body)}</div>`;
+      ${warn}
+      <div class="doc-viewer-body">${bodyHtml}</div>`;
   }catch(e){
     viewer.innerHTML=`<div class="doc-viewer-empty">加载失败：${esc(e.message)}</div>`;
   }

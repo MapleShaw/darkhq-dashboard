@@ -90,7 +90,7 @@ async function loadCronFull(){
           <div class="cron-time">${fmtTime(job.lastRun)}</div>
           <div class="cron-time next">${fmtTime(job.nextRun)}</div>
           <div class="cron-schedule">${esc(job.schedule)}</div>
-          <div class="cron-row-detail">
+          <div class="cron-row-detail" onclick="event.stopPropagation()">
             <div class="cron-row-detail-inner">
               <div class="detail-field"><label>例牌 ID</label><code>${esc(job.id||'—')}</code></div>
               <div class="detail-field"><label>Cron 表达式</label><code>${cronExpr}</code></div>

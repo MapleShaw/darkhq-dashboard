@@ -326,6 +326,19 @@ async function loadTokenMini() {
   if (!host) return;
   try {
     const data = await fetch('/api/usage').then((r) => r.json());
+    if (data.notConnected) {
+      host.innerHTML = `
+        <div style="padding:0.6rem 0;font-size:0.82rem;color:var(--text-2)">
+          <div style="color:var(--warn);margin-bottom:0.3rem">⚠ 未对接</div>
+          <div style="font-size:0.75rem;color:var(--text-3);line-height:1.5">
+            ${esc(data.reason || 'Gateway 未暴露 /api/usage')}
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-3);margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--line)">
+            对接方式见 PROJECT.md §7.6
+          </div>
+        </div>`;
+      return;
+    }
     const u = data.usage || {};
     const models = u.models || [];
     const total = u.totalTokens || 0;

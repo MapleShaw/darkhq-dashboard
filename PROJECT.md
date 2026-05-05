@@ -126,6 +126,9 @@ darkhq-dashboard/
 ├── .gitignore              # 忽略 node_modules / data / bot-settings.json
 ├── nginx-darkhq.conf       # nginx 反代模板
 │
+├── scripts/
+│   └── cron-wrapper.sh     # 例牌包装器，把运行记录回写到 dashboard（给 OpenClaw 用）
+│
 ├── public/
 │   ├── index.html          # 堂口
 │   ├── cron.html           # 日程
@@ -241,7 +244,30 @@ Response:
 
 ### 7.2 ⚠️ 例牌运行记录
 
-Dashboard 已经暴露 `POST /api/cron/:jobId/runs`。**OpenClaw 在每个 cron 任务 wrapper 里加一行 curl 即可**：
+Dashboard 已经暴露 `POST /api/cron/:jobId/runs`，存到 `data/cron-runs/{jobId}/*.json`，在「日程 › 展开」里显示最近 10 次出勤。
+
+#### 推荐方式：用仓库自带的 wrapper 脚本
+
+`scripts/cron-wrapper.sh`（随代码仓库一起提交）帮你把"跑任务 + 量时长 + 抓输出 + 回写 dashboard"全部搞定。
+
+在 OpenClaw 的 crontab 里，**把原来直接写的命令改成 wrapper 包装一层**即可：
+
+```crontab
+# 之前：
+30 15 * * * node /home/openclaw/.openclaw/signal-radar.js
+
+# 之后：
+30 15 * * * /home/openclaw/darkhq-dashboard/scripts/cron-wrapper.sh signal-radar node /home/openclaw/.openclaw/signal-radar.js
+```
+
+Wrapper 会：
+- 记录开始时间 + 时长（毫秒）
+- 抓 stdout/stderr 作为 `output`（自动截断到 4KB，防止塞爆）
+- 根据退出码判断 `success` / `failed`
+- POST 回写到 dashboard，失败静默（不影响任务本身）
+- 最后用任务真实退出码退出（系统的 cron 报错邮件照常触发）
+
+#### 手工方式（不想用 wrapper 时）
 
 ```bash
 curl -X POST http://localhost:9700/api/cron/signal-radar/runs \
@@ -254,7 +280,13 @@ curl -X POST http://localhost:9700/api/cron/signal-radar/runs \
   }'
 ```
 
-Dashboard 自动按 `{jobId}/{timestamp}.json` 归档，读取时返回最新 10 条。**这是最小对接，强烈建议做**。
+**字段约定**（POST body）：
+- `status`: `"success"` / `"failed"` / `"running"`（必填）
+- `output`: 任务的原始输出，建议保留原样，dashboard 会用等宽字体展示（必填，可空字符串）
+- `startedAt`: ISO 8601 时间戳（可选，不填用服务器当前时间）
+- `durationMs`: 毫秒数（可选）
+
+**这是最小对接，强烈建议做**。做完后所有例牌会从"未知"变为"搞掂/失手"，展开能看到真实的运行历史。
 
 ### 7.3 ✅ Signal Radar（已对接，2026-05 升级）
 
@@ -342,30 +374,28 @@ workspace/docs/
 
 ### 7.6 ⚠️ Token 用量统计（口径 + 契约）
 
-> **背景**：Dashboard 在堂口首页侧栏有「Token 用量」卡，在班底卡片上也要显示每位兄弟的「今日 Token」。因此 `/api/usage` 的口径必须明确，且需要按 bot 维度拆分。
+> **当前状态（2026-05）**：**OpenClaw gateway 未实现 `/api/usage`**。
+>
+> Dashboard 调不到数据时会返回 `{ ok: true, notConnected: true, reason: '...' }`，前端会显示"⚠ Gateway 未对接该接口"而不是假数据。下面是让 gateway 这端实现的完整指引。
 
-#### 口径定义
+#### 当前诊断
 
-| 字段 | 含义 | 计算方式 |
-|---|---|---|
-| `totalTokens` | 累计消耗（input + output） | 从 `statPeriod` 起点到现在的总和 |
-| `todayTokens` | 今日消耗 | `timezone` 时区今日 00:00 至今的新增 |
-| `models[].tokens` | 按模型的累计 | 同 totalTokens 的口径，按模型拆 |
-| `models[].pct` | 模型占比 | 整数 0-100，`round(tokens / totalTokens * 100)` |
-| `bots[].todayTokens` | 某个 bot 今日消耗 | **按 bot 维度的 todayTokens** |
-| `bots[].totalTokens` | 某个 bot 累计 | 可选，不填 dashboard 也能跑 |
-| `statPeriod` | 累计起点说明 | 字符串，如 `"2026-04-01 起累计"` 或 `"since deploy"` |
-| `timezone` | 今日口径的时区 | 字符串，如 `"Asia/Shanghai"` |
+在服务器上跑这两条 curl 确认是哪种情况：
 
-**关键约束**：
-- `input + output` 都算进 token 消耗（与大模型厂商计费口径一致）
-- `todayTokens` 必须**基于 timezone 字段指定的时区**计算当日边界，不是 UTC
-- `bots` 数组用的 `id` 必须和 `/api/bots` 返回的 `bot.id` 一一对应（见 §3.3 codename 表）
-- 所有字段**都可以缺省**：Dashboard 见到缺省字段会降级显示 `—`，不会报错
+```bash
+# 1) Dashboard 自己的接口（看它返回 notConnected 原因）
+curl -s http://localhost:9700/api/usage | jq
 
-#### 完整契约示例
+# 2) 绕过 dashboard 直接问 gateway
+TOKEN=$(jq -r '.gateway.auth.token' /home/openclaw/.openclaw/openclaw.json)
+curl -sv -H "Authorization: Bearer $TOKEN" http://localhost:18789/api/usage
+# 404/501 → gateway 完全没这个路由
+# 200 但字段不对 → 路由有但口径不符（见下文契约）
+```
 
-`GET http://localhost:18789/api/usage`（OpenClaw gateway 应返回）：
+#### 契约：gateway 应该返回的结构
+
+`GET http://localhost:18789/api/usage` （带 `Authorization: Bearer <token>`）：
 
 ```json
 {
@@ -390,19 +420,91 @@ workspace/docs/
 }
 ```
 
-#### Dashboard 侧的处理
+#### 字段说明
 
-1. **侧栏 Token 卡**（`/api/usage`）：直接展示 `totalTokens` / `todayTokens` / 分模型进度条 / `statPeriod + timezone` 口径说明
-2. **班底卡片今日 Token**（`/api/bots`）：server.js 在响应 `/api/bots` 时会**内部调一次 `GET /api/usage`**，把 `usage.bots[*].todayTokens` 合并到对应 bot 对象上。OpenClaw 那端不用单独再暴露 per-bot 接口，只要 `/api/usage` 里带 `bots` 数组就行
+| 字段 | 含义 | 计算方式 |
+|---|---|---|
+| `totalTokens` | 累计消耗（input + output） | 从 `statPeriod` 起点到现在的总和 |
+| `todayTokens` | 今日消耗 | `timezone` 时区今日 00:00 至今的新增 |
+| `models[].tokens` | 按模型的累计 | 同 totalTokens 的口径，按模型拆 |
+| `models[].pct` | 模型占比 | 整数 0-100，`round(tokens / totalTokens * 100)` |
+| `bots[].todayTokens` | 某个 bot 今日消耗 | **按 bot 维度的 todayTokens**，给班底卡片用 |
+| `bots[].totalTokens` | 某个 bot 累计 | 可选，不填 dashboard 也能跑 |
+| `statPeriod` | 累计起点说明 | 字符串，如 `"2026-04-01 起累计"` 或 `"since deploy"` |
+| `timezone` | 今日口径的时区 | 字符串，如 `"Asia/Shanghai"` |
+
+**关键约束**：
+- `input + output` 都算进 token 消耗（与大模型厂商计费口径一致）
+- `todayTokens` 必须**基于 timezone 字段指定的时区**计算当日边界，不是 UTC
+- `bots[].id` 必须和 `/api/bots` 返回的 `bot.id` 一一对应（见 §3.3 codename 表：main/content/tech/intel/assistant）
+- 所有字段**都可以缺省**：Dashboard 见到缺省字段会降级显示 `—`，不会报错
+- 只要**顶层有 `totalTokens`（或 `models[]` 数组）**，dashboard 就认为"对接成功"，否则归类为 notConnected
+
+#### Gateway 侧实现指引（给 OpenClaw 开发者）
+
+Gateway 要拿到每次 LLM 调用的 usage，**数据来自哪里**：
+
+1. **Claude API 响应**：`message.usage.input_tokens` + `message.usage.output_tokens`
+2. **OpenAI 兼容接口**（Ling 等）：`response.usage.prompt_tokens` + `response.usage.completion_tokens`
+3. **Anthropic SDK / OpenAI SDK 都会在 response 里带 usage 字段**
+
+**建议的实现方式**（任选一种，按工作量从小到大）：
+
+| 方案 | 工作量 | 说明 |
+|---|---|---|
+| A. SQLite 每次调用写一行 | 低 | 一张表 `llm_calls(ts, bot_id, model, input, output)`，`/api/usage` 做几个 SUM / GROUP BY 聚合返回 |
+| B. 文件 append-only | 最低 | `usage.jsonl` 每次调用追加一行，`/api/usage` 启动时加载到内存 + 增量维护。适合没 DB 的场景 |
+| C. 查 LLM 厂商的账单 API | 高 | Anthropic / 各家都有 usage API，但延迟 1-2 天、不能按 bot 拆、需要多 API key |
+
+**推荐 A**。每个 bot 在发起 LLM 调用的那层加拦截器就行，gateway 层拦最方便。
+
+#### Dashboard 侧怎么消费
+
+1. **侧栏 Token 卡**（`/api/usage`）：展示 `totalTokens` / `todayTokens` / 分模型进度条 / `statPeriod + timezone` 口径说明
+2. **班底卡片今日 Token**（`/api/bots`）：server.js 在响应 `/api/bots` 时会**内部调一次 `GET /api/usage`**，把 `usage.bots[*].todayTokens` 合并到对应 bot 对象上。Gateway 不用单独暴露 per-bot 接口，只要 `/api/usage` 里带 `bots` 数组就行
 
 #### 不变量校验（建议）
 
-如果希望 dashboard 显示一致，OpenClaw 那端实现时建议保证：
+如果希望 dashboard 显示一致，gateway 实现时建议保证：
 - `sum(bots[].todayTokens) ≈ todayTokens`（允许小误差，如舍入）
 - `sum(models[].tokens) ≈ totalTokens`
 - `sum(models[].pct) = 100`
 
 ---
+
+### 7.7 ⚠️ 聊天底（memory）目录命名与大小建议
+
+> **背景**：当前 `workspace/memory/` 下文件命名不统一，有的按日期（`2026-05-05.md`）、有的按主题（`2026-05-05-dashboard-cron.md`）、还有无日期的累积型笔记（`ideas.md` 361KB、`daily-english-notes.md`）。这导致 Dashboard 的"卷宗 › 聊天底"tab 列表混乱，大文件也会让浏览器渲染卡顿。
+
+#### 建议的目录规则
+
+| 文件形态 | 放哪里 | 命名 |
+|---|---|---|
+| 每日对话日志（全天） | `workspace/memory/` | `YYYY-MM-DD.md` |
+| 主题化的子日志（一天多主题） | `workspace/memory/` | `YYYY-MM-DD-主题.md`，主题用英文短横杠 |
+| **累积型笔记 / 长期列表** | **`workspace/docs/{bot_codename}/`** | 可读中文名，如 `灵感收集.md`、`每日美语笔记.md` |
+| 整理过的正式产出 | `workspace/docs/{bot_codename}/` | 见 §7.5 |
+
+**判断标准**：如果一个文件"会持续追加、不会主动清空、按时间线无意义"，它就不属于 `memory/`，应该挪到 `docs/` 里。
+
+#### 大小限制
+
+- **单个 md 文件建议 < 50 KB**（Dashboard 的 markdown 渲染对大文件会卡）
+- Dashboard 前端兜底：
+  - 文件 > 150 KB → 自动切换纯文本模式，关闭 markdown 渲染，并显示警告
+  - 文件 > 500 KB → 截断到前 300 KB 显示，警告"请去服务器文件系统查看完整原文"
+- 超过阈值的文件建议按主题或日期切分（比如把 `ideas.md` 按月切成 `ideas/2026-04.md`、`ideas/2026-05.md`）
+
+#### 给 Bot 的 prompt 提示建议
+
+写入 memory 的 bot 可以加一条系统指令：
+
+> 每日对话日志按 `YYYY-MM-DD.md` 命名，同一天多主题时按 `YYYY-MM-DD-主题.md` 切分。
+> 长期累积型笔记（如灵感、名言、学习记录）不要写 memory/，要写到 `workspace/docs/{你的 codename}/` 目录下，用可读中文名。
+> 单文件超过 50KB 时主动按时间或主题切分。
+
+这个目录整顿工作量应该不大（bot 的写入逻辑调整 + 已有文件做一次 mv），但收益很大：卷宗页会变得整齐，不会再出现单个 300KB+ 的聊天底让 dashboard 卡死。
+
 
 ## 8. 服务器部署 & 更新
 
@@ -501,10 +603,12 @@ sudo journalctl -u darkhq-dashboard -f
 ## 10. 待办
 
 - [ ] §7.1 Bot 运行时状态对接
-- [ ] §7.2 例牌运行历史回写（cron job prompt 已加 curl 回写指令，等明天验证）
+- [ ] §7.2 例牌运行历史回写（使用仓库自带的 `scripts/cron-wrapper.sh` 最省事）
 - [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
+- [x] §7.3 Signal 双读去重 + 归档口径修复（2026-05-05 v3.3.1）
 - [ ] §7.5 档案目录约定
-- [ ] §7.6 Token 用量 `bots[]` 按 bot 拆分（新增契约）
+- [ ] §7.6 Gateway `/api/usage` 实现（当前 dashboard 显示"未对接"）
+- [ ] §7.7 memory/ 目录整顿 + 累积型笔记迁移到 docs/
 - [ ] 卷宗支持全文搜索
 - [ ] 权限控制（现在完全裸奔）
 - [ ] SQLite 存储替代 JSON 文件归档（数据量大后考虑）

@@ -160,6 +160,17 @@ async function loadUsage(){
   el.innerHTML='<div class="loading">载入中…</div>';
   try{
     const data=await fetch('/api/usage').then(r=>r.json());
+    if(data.notConnected){
+      el.innerHTML=`
+        <div style="padding:1rem 1.2rem;background:rgba(242,185,75,0.08);border-left:3px solid var(--warn);border-radius:0 var(--r-sm) var(--r-sm) 0">
+          <div style="color:var(--warn);font-weight:600;margin-bottom:0.4rem">⚠ Gateway 未对接 Token 用量接口</div>
+          <div style="font-size:0.85rem;color:var(--text-2);line-height:1.6">${esc(data.reason||'Gateway 未暴露 /api/usage')}</div>
+          <div style="font-size:0.8rem;color:var(--text-3);margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--line)">
+            对接指引见 <a href="https://github.com" style="color:var(--accent-2)">PROJECT.md §7.6</a>（需要 OpenClaw gateway 实现 <code>GET /api/usage</code>，返回含 <code>totalTokens / todayTokens / models[] / bots[]</code> 的结构）
+          </div>
+        </div>`;
+      return;
+    }
     const u=data.usage||{};
     const models=u.models||[];
     el.innerHTML=`

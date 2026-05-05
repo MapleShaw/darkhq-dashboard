@@ -2,6 +2,28 @@
 
 所有值得记录的变更都会出现在这里。
 
+## v3.3.2 — 2026-05-05 · Token 对接 + 大文件保护 + 交互细节
+
+### 修复
+- `/api/usage` 线上拿不到数据时，过去会返回硬编码假数据（`totalTokens: 284500`，永远对不上），导致用户误以为已对接。现在改为返回 `{ ok: true, notConnected: true, reason }`，UI 明确显示"⚠ Gateway 未对接"，并给出对接指引链接
+- 日程展开后详情内部**左侧无留白**，紧贴父卡片边缘；现在加了 `padding-left: 1.6rem` + 酒红色的左侧细线，视觉上更像"嵌在父行里"的子区域
+- 日程展开区点击任意位置会**冒泡到行头触发收起**（选中文字、复制 cron 表达式、点历史条目都会误触）；给 `.cron-row-detail` 加 `stopPropagation`，详情区吞掉 click 事件
+- 卷宗里打开大文件（如 300KB+ 的 `ideas.md`）会**一直转圈**——原因是朴素 markdown 渲染里的 table/列表正则在大文本上回溯爆炸。现在加了分级保护：
+  - 文件 > 150KB → 切换纯文本模式 + 警告
+  - 文件 > 500KB → 截断到前 300KB + 警告"去服务器看完整原文"
+
+### 改进
+- `/api/signals/history` 增加 **id 去重**（防御旧脏数据）+ **今日实时拼进去**（不再依赖当天必须访问过 `/api/signals` 才有归档）
+- 抽出 `liveSignalsAll()` 共用函数，`/api/signals` 和 `/api/signals/history` 复用同一套"主源 + 兜底"逻辑
+
+### 新增
+- `scripts/cron-wrapper.sh` —— 给 OpenClaw 那边用的 cron 包装器，自动把任务运行记录回写到 dashboard，crontab 里原命令前加一层调用即可
+- PROJECT.md §7.6 重写：**明确标注 gateway 未实现**，加了诊断步骤 + gateway 侧实现指引（SQLite / JSONL / 厂商账单 API 三种方案）
+- PROJECT.md §7.7 新增：**memory/ 目录命名与大小建议**，针对当前命名混乱 + 累积型笔记过大的问题，给 OpenClaw 那边提出整顿方案
+- PROJECT.md §7.2 重写：推荐用 `cron-wrapper.sh`，手动 curl 作为次选
+
+---
+
 ## v3.3.1 — 2026-05-05 · 信号数据源去重修复
 
 ### 修复
