@@ -2,7 +2,7 @@
 
 > **给 OpenClaw 那端拉代码后让这个 dashboard 跑起来、并把真实数据接进来的人。**
 >
-> 版本：v3.2（2026-05）
+> 版本：v3.3（2026-05）
 > 仓库：本地 dev → push 到 GitHub → 服务器 pull + restart
 
 ---
@@ -94,6 +94,7 @@
 | 正在开工 | `currentTask: '...'` |
 | 最近一单 | `lastTaskName` / `lastTaskStatus` / `lastTaskTime` |
 | 本周 N 单 | `weekTasks: N` |
+| 今日 Token | `todayTokens: N`（来自 `/api/usage` 的 `bots[]` 合并） |
 | 线路 | `gateway` |
 | 接通 / 断线 | `gatewayOnline: true / false` |
 | 搞掂 | `status: 'success'` |
@@ -257,13 +258,24 @@ Dashboard 自动按 `{jobId}/{timestamp}.json` 归档，读取时返回最新 10
 
 ### 7.3 ✅ Signal Radar（已对接，2026-05 升级）
 
-Dashboard 现在同时支持两种数据源，优先使用新的：
+Dashboard 使用 **"主源优先 + 兜底按 source 补位"** 策略读取信号数据，两种数据源可同时存在，不会重复。
 
-**主要来源（推荐）：`content-signal-radar/dashboard-signals.json`**
+#### 优先级规则
 
-由 `prepare-digest.js` 每次运行后自动写出（cron job 每天 15:30 跑）。包含即刻、RSS 博客、X 推文的全量高信号，无需 API key。
+1. **主源**：`content-signal-radar/dashboard-signals.json`
+   - 由 `prepare-digest.js` 每次运行后自动写出（cron job 每天 15:30 跑）
+   - 包含即刻、RSS 博客、X 推文的全量高信号，**无需 API key**
+   - **只要文件存在，它覆盖的 source 就不再读兜底**（例如主源里有 `source: 'x'` 的条目，就不会再读 `feed-x.json`）
 
-数据结构：
+2. **兜底**：`feed-{blogs,x,podcasts}.json`
+   - 由 `generate-feed.js`（GitHub Actions）生成，需要 `X_BEARER_TOKEN` + `SUPADATA_API_KEY`
+   - **只在"主源里该 source 为空"时补位**。例如主源暂不处理 podcast，`feed-podcasts.json` 就会被读取来补 podcast 数据
+   - 如果 secrets 未配置，兜底文件本身也是空的，降级为只有主源
+
+> **关键**：这个 "source 级别的 override" 规则由 Dashboard 在 `server.js` 的 `/api/signals` 里实现，OpenClaw 那端不用关心。主源产出就只管写 `dashboard-signals.json`，不需要考虑会不会和 `feed-*.json` 冲突。
+
+#### 主源数据结构
+
 ```json
 {
   "generatedAt": "2026-05-05T07:30:00.000Z",
@@ -271,7 +283,7 @@ Dashboard 现在同时支持两种数据源，优先使用新的：
   "signals": [
     {
       "id": "https://x.com/user/status/123",
-      "source": "x",              // "x" | "blog" | "podcast"
+      "source": "x",              // "x" | "blog" | "podcast"（当前主源仅前两个）
       "sourceName": "Zara Zhang",
       "handle": "zarazhangrui",   // 仅 x 有
       "title": "...",
@@ -287,13 +299,16 @@ Dashboard 现在同时支持两种数据源，优先使用新的：
 }
 ```
 
-**降级来源（兜底）：`feed-{blogs,x,podcasts}.json`**
+#### 归档
 
-由 `generate-feed.js`（GitHub Actions）生成，需要 `X_BEARER_TOKEN` + `SUPADATA_API_KEY`。如果没配 secrets，x 和 podcast 会是空的，只有 blog 有内容。
+- 每次 `/api/signals` 被访问时，**用全量数据（合并主源 + 兜底，不受 `?source=xx` 过滤影响）**自动存一份到 `data/signals-archive/{YYYY-MM-DD}.json`
+- 同一天多次访问会覆盖当日文件（保留最后一次快照）
+- 这个归档供 `/api/signals/history?days=N` 用于风声页"旧账"tab
 
-**归档**：每次 `/api/signals` 被访问时自动存一份 `data/signals-archive/{YYYY-MM-DD}.json`。
+#### 建议
 
-**建议**：让 signal-radar cron job 跑完后顺手 touch 一下归档：
+让 signal-radar cron job 跑完后主动 touch 一下归档（确保每天至少归档一次）：
+
 ```bash
 curl -s http://localhost:9700/api/signals > /dev/null
 ```
@@ -324,6 +339,68 @@ workspace/docs/
 - 会按 bot 在"档案"tab 里分组过滤
 
 这个目录现在还没有，需要 OpenClaw 那端配合建立并约定。
+
+### 7.6 ⚠️ Token 用量统计（口径 + 契约）
+
+> **背景**：Dashboard 在堂口首页侧栏有「Token 用量」卡，在班底卡片上也要显示每位兄弟的「今日 Token」。因此 `/api/usage` 的口径必须明确，且需要按 bot 维度拆分。
+
+#### 口径定义
+
+| 字段 | 含义 | 计算方式 |
+|---|---|---|
+| `totalTokens` | 累计消耗（input + output） | 从 `statPeriod` 起点到现在的总和 |
+| `todayTokens` | 今日消耗 | `timezone` 时区今日 00:00 至今的新增 |
+| `models[].tokens` | 按模型的累计 | 同 totalTokens 的口径，按模型拆 |
+| `models[].pct` | 模型占比 | 整数 0-100，`round(tokens / totalTokens * 100)` |
+| `bots[].todayTokens` | 某个 bot 今日消耗 | **按 bot 维度的 todayTokens** |
+| `bots[].totalTokens` | 某个 bot 累计 | 可选，不填 dashboard 也能跑 |
+| `statPeriod` | 累计起点说明 | 字符串，如 `"2026-04-01 起累计"` 或 `"since deploy"` |
+| `timezone` | 今日口径的时区 | 字符串，如 `"Asia/Shanghai"` |
+
+**关键约束**：
+- `input + output` 都算进 token 消耗（与大模型厂商计费口径一致）
+- `todayTokens` 必须**基于 timezone 字段指定的时区**计算当日边界，不是 UTC
+- `bots` 数组用的 `id` 必须和 `/api/bots` 返回的 `bot.id` 一一对应（见 §3.3 codename 表）
+- 所有字段**都可以缺省**：Dashboard 见到缺省字段会降级显示 `—`，不会报错
+
+#### 完整契约示例
+
+`GET http://localhost:18789/api/usage`（OpenClaw gateway 应返回）：
+
+```json
+{
+  "usage": {
+    "totalTokens": 1284500,
+    "todayTokens": 52300,
+    "statPeriod": "2026-04-01 起累计",
+    "timezone": "Asia/Shanghai",
+    "models": [
+      { "model": "Claude Opus 4.6",   "tokens": 642250, "pct": 50 },
+      { "model": "Claude Sonnet 4.6", "tokens": 385350, "pct": 30 },
+      { "model": "Ling 2.6 1T",       "tokens": 256900, "pct": 20 }
+    ],
+    "bots": [
+      { "id": "main",      "todayTokens":  8200, "totalTokens": 192000 },
+      { "id": "content",   "todayTokens": 18400, "totalTokens": 512300 },
+      { "id": "tech",      "todayTokens":  4100, "totalTokens": 128900 },
+      { "id": "intel",     "todayTokens":  6800, "totalTokens": 156800 },
+      { "id": "assistant", "todayTokens": 14800, "totalTokens": 294500 }
+    ]
+  }
+}
+```
+
+#### Dashboard 侧的处理
+
+1. **侧栏 Token 卡**（`/api/usage`）：直接展示 `totalTokens` / `todayTokens` / 分模型进度条 / `statPeriod + timezone` 口径说明
+2. **班底卡片今日 Token**（`/api/bots`）：server.js 在响应 `/api/bots` 时会**内部调一次 `GET /api/usage`**，把 `usage.bots[*].todayTokens` 合并到对应 bot 对象上。OpenClaw 那端不用单独再暴露 per-bot 接口，只要 `/api/usage` 里带 `bots` 数组就行
+
+#### 不变量校验（建议）
+
+如果希望 dashboard 显示一致，OpenClaw 那端实现时建议保证：
+- `sum(bots[].todayTokens) ≈ todayTokens`（允许小误差，如舍入）
+- `sum(models[].tokens) ≈ totalTokens`
+- `sum(models[].pct) = 100`
 
 ---
 
@@ -427,6 +504,7 @@ sudo journalctl -u darkhq-dashboard -f
 - [ ] §7.2 例牌运行历史回写（cron job prompt 已加 curl 回写指令，等明天验证）
 - [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
 - [ ] §7.5 档案目录约定
+- [ ] §7.6 Token 用量 `bots[]` 按 bot 拆分（新增契约）
 - [ ] 卷宗支持全文搜索
 - [ ] 权限控制（现在完全裸奔）
 - [ ] SQLite 存储替代 JSON 文件归档（数据量大后考虑）

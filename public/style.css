@@ -265,18 +265,36 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   gap: 1rem;
 }
 .bot-card {
-  background: var(--bg-1);
+  background: linear-gradient(180deg, #16161b 0%, #131318 100%);
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--r-lg);
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s, box-shadow 0.18s;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
 }
-.bot-card:hover { background: var(--bg-2); transform: translateY(-2px); }
+.bot-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  pointer-events: none;
+}
+.bot-card:hover {
+  background: linear-gradient(180deg, #1c1a20 0%, #17141a 100%);
+  border-color: rgba(224,72,80,0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 24px rgba(200,50,58,0.15);
+}
+.bot-card:hover::before {
+  background: linear-gradient(90deg, transparent, rgba(224,72,80,0.6), transparent);
+}
 .bot-card-top {
   display: flex;
   align-items: center;

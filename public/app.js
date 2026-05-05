@@ -147,6 +147,12 @@ function renderBotCard(bot) {
          <span class="val">${esc(bot.lastSeen || '—')}</span>
        </div>`;
 
+  const tokenLine = `
+    <div class="bot-card-meta-row">
+      <span class="key">今日 Token</span>
+      <span class="val mono">${bot.todayTokens != null ? fmtNum(bot.todayTokens) : '—'}</span>
+    </div>`;
+
   return `
   <a href="/docs.html?bot=${esc(bot.id)}" class="bot-card">
     <div class="bot-card-top">
@@ -165,6 +171,7 @@ function renderBotCard(bot) {
     <div class="bot-card-meta">
       ${nowTaskLine}
       ${lastTaskLine}
+      ${tokenLine}
       <div class="bot-card-meta-row">
         <span class="key">本周</span>
         <span class="val">${bot.weekTasks != null ? bot.weekTasks + ' 单' : '—'}</span>
@@ -322,6 +329,8 @@ async function loadTokenMini() {
     const u = data.usage || {};
     const models = u.models || [];
     const total = u.totalTokens || 0;
+    const period = u.statPeriod ? esc(u.statPeriod) : '累计';
+    const tz = u.timezone ? esc(u.timezone) : '本地时区';
     host.innerHTML = `
       <div class="token-mini-top">
         <span class="total">${fmtNum(total)}</span>
@@ -336,6 +345,10 @@ async function loadTokenMini() {
             <span><span class="token-bar-seg s${i}" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:0.4rem;vertical-align:middle"></span>${esc(m.model)}</span>
             <span class="n">${fmtNum(m.tokens)} · ${m.pct}%</span>
           </div>`).join('')}
+      </div>
+      <div style="font-size:0.68rem;color:var(--text-3);padding-top:0.6rem;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:0.4rem;flex-wrap:wrap">
+        <span>口径：${period}</span>
+        <span>${tz}</span>
       </div>`;
   } catch (e) {
     host.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;

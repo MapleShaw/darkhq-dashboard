@@ -110,8 +110,25 @@ app.get('/api/bots', async (req, res) => {
     runtimeData.bots.forEach((b) => { runtimeMap[b.id] = b; });
   }
 
+  // 顺手拉一次 usage，把 per-bot 的 todayTokens 合并到每张卡（失败不影响主流程）
+  const tokenMap = {};
+  try {
+    const token = getGatewayToken();
+    if (token) {
+      const r = await fetch(`${GATEWAY_URL}/api/usage`, {
+        headers: { Authorization: `Bearer ${token}` }, timeout: 2000,
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const botsArr = (j.usage && j.usage.bots) || j.bots || [];
+        botsArr.forEach((b) => { tokenMap[b.id] = b; });
+      }
+    }
+  } catch (e) {}
+
   const result = bots.map((b) => {
     const rt = runtimeMap[b.id] || {};
+    const tk = tokenMap[b.id] || {};
     return {
       ...b,
       avatarUrl: `/avatars/bot-${b.id}.png`,
@@ -122,6 +139,7 @@ app.get('/api/bots', async (req, res) => {
       lastTaskTime: rt.lastTaskTime || null,
       lastTaskStatus: rt.lastTaskStatus || 'unknown',
       weekTasks: rt.weekTasks || 0,
+      todayTokens: tk.todayTokens != null ? tk.todayTokens : null,
       lastSeen: rt.lastSeen || (sessionMap[b.id] ? sessionMap[b.id] + ' (log)' : (gatewayOnline ? '活跃中' : '离线')),
       statusUpdatedAt: runtimeData ? runtimeData.updatedAt : null,
     };
@@ -249,39 +267,53 @@ app.post('/api/cron/:jobId/runs', (req, res) => {
 });
 
 // ─── API: Signals（当前）─────────────────────────────────
+//
+// 数据源优先级（见 PROJECT.md §7.3）：
+//   1. 主源 dashboard-signals.json（prepare-digest.js 产出）
+//      - 含 blog + x + podcast 的高信号，无需 API key
+//      - 只要文件存在，对应的 source 就不再读兜底
+//   2. 兜底 feed-{blogs,x,podcasts}.json（generate-feed.js 产出）
+//      - 只在"主源里这个 source 没数据"时补位
+//      - 例如主源只有 blog+x，podcast 就会从 feed-podcasts.json 读
 app.get('/api/signals', (req, res) => {
   const source = req.query.source || 'all';
   if (USE_MOCK) return res.json(mockData.mockSignals(source));
 
-  const signals = [];
-  const readFeed = (fname, key, mapFn) => {
-    try {
-      const data = safeReadJson(path.join(SIGNAL_DIR, fname), null);
-      if (data && data[key]) data[key].forEach((item) => signals.push(mapFn(item, data)));
-    } catch (e) {}
-  };
+  const all = [];                  // 全量信号，用于归档
+  const coveredBySources = new Set(); // 主源已覆盖的 source 集合
 
-  // 优先读 prepare-digest.js 写出的 dashboard-signals.json（含即刻/RSS 全部高信号）
+  // ── 1) 主源 dashboard-signals.json ─────────────────────
   try {
     const dashData = safeReadJson(path.join(SIGNAL_DIR, 'dashboard-signals.json'), null);
     if (dashData && Array.isArray(dashData.signals)) {
-      dashData.signals.forEach((item) => signals.push({
-        id: item.id || item.url,
-        source: item.source,
-        sourceName: item.sourceName || item.handle || '',
-        title: item.title,
-        url: item.url,
-        summary: item.summary || '',
-        reason: item.reviewNote || (item.topic ? `[${item.topic}]` : '高信号内容'),
-        score: item.score || 70,
-        publishedAt: item.publishedAt || dashData.generatedAt,
-        generatedAt: dashData.generatedAt,
-        needsReview: item.needsReview || false,
-      }));
+      dashData.signals.forEach((item) => {
+        all.push({
+          id: item.id || item.url,
+          source: item.source,
+          sourceName: item.sourceName || item.handle || '',
+          title: item.title,
+          url: item.url,
+          summary: item.summary || '',
+          reason: item.reviewNote || (item.topic ? `[${item.topic}]` : '高信号内容'),
+          score: item.score || 70,
+          publishedAt: item.publishedAt || dashData.generatedAt,
+          generatedAt: dashData.generatedAt,
+          needsReview: item.needsReview || false,
+        });
+        if (item.source) coveredBySources.add(item.source);
+      });
     }
   } catch (e) {}
 
-  readFeed('feed-blogs.json', 'blogs', (item, data) => ({
+  // ── 2) 兜底 feed-*.json（仅补主源未覆盖的 source）──────
+  const readFallback = (src, fname, key, mapFn) => {
+    if (coveredBySources.has(src)) return;
+    const data = safeReadJson(path.join(SIGNAL_DIR, fname), null);
+    if (!data || !Array.isArray(data[key])) return;
+    data[key].forEach((item) => all.push(mapFn(item, data)));
+  };
+
+  readFallback('blog', 'feed-blogs.json', 'blogs', (item, data) => ({
     id: item.url, source: 'blog', sourceName: item.name || 'Blog',
     title: item.title, url: item.url,
     summary: item.description || (item.content ? item.content.slice(0, 200) + '...' : ''),
@@ -289,14 +321,14 @@ app.get('/api/signals', (req, res) => {
     publishedAt: item.publishedAt || data.generatedAt,
     generatedAt: data.generatedAt,
   }));
-  readFeed('feed-x.json', 'x', (item, data) => ({
+  readFallback('x', 'feed-x.json', 'x', (item, data) => ({
     id: item.id || item.url, source: 'x', sourceName: item.author || 'X',
     title: (item.text || 'Tweet').slice(0, 80), url: item.url,
     summary: item.text || '', reason: item.aiReason || '热门讨论',
     score: item.score || 65, publishedAt: item.publishedAt || data.generatedAt,
     generatedAt: data.generatedAt,
   }));
-  readFeed('feed-podcasts.json', 'podcasts', (item, data) => ({
+  readFallback('podcast', 'feed-podcasts.json', 'podcasts', (item, data) => ({
     id: item.url || item.title, source: 'podcast', sourceName: item.show || 'Podcast',
     title: item.title, url: item.url,
     summary: item.description ? item.description.slice(0, 200) + '...' : '',
@@ -305,18 +337,20 @@ app.get('/api/signals', (req, res) => {
     generatedAt: data.generatedAt,
   }));
 
-  let filtered = source === 'all' ? signals : signals.filter((s) => s.source === source);
-  filtered.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+  // 排序（全量）
+  all.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
 
-  // 简化归档方案：每次读到新快照就存一份（按日）
-  if (filtered.length) {
+  // ── 归档用全量（不被 source 过滤影响）──────────────────
+  if (all.length) {
     const key = todayKey();
     const archiveFile = path.join(DATA_SIGNALS_ARCHIVE, `${key}.json`);
     try {
-      fs.writeFileSync(archiveFile, JSON.stringify({ date: key, signals: filtered }, null, 2), 'utf8');
+      fs.writeFileSync(archiveFile, JSON.stringify({ date: key, signals: all }, null, 2), 'utf8');
     } catch (e) {}
   }
 
+  // ── 应用 source 过滤后返给前端 ─────────────────────────
+  const filtered = source === 'all' ? all : all.filter((s) => s.source === source);
   res.json({ ok: true, signals: filtered, total: filtered.length });
 });
 

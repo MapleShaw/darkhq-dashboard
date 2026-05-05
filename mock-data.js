@@ -27,18 +27,22 @@ function mockBots() {
     assistant: { status: 'online',  lastTaskName: '每日会话自动日志',    lastTaskTime: min(3),   lastTaskStatus: 'success', weekTasks: 31, currentTask: null },
   };
 
-  const bots = BOT_META.map((b) => ({
-    ...b,
-    avatarUrl: `/avatars/bot-${b.id}.png`,
-    online: runtime[b.id].status !== 'offline',
-    status: runtime[b.id].status,
-    currentTask: runtime[b.id].currentTask,
-    lastTaskName: runtime[b.id].lastTaskName,
-    lastTaskTime: runtime[b.id].lastTaskTime.toISOString(),
-    lastTaskStatus: runtime[b.id].lastTaskStatus,
-    weekTasks: runtime[b.id].weekTasks,
-    lastSeen: fmtShort(runtime[b.id].lastTaskTime),
-  }));
+  const bots = BOT_META.map((b) => {
+    const usage = (mockUsage().usage.bots || []).find((u) => u.id === b.id) || {};
+    return {
+      ...b,
+      avatarUrl: `/avatars/bot-${b.id}.png`,
+      online: runtime[b.id].status !== 'offline',
+      status: runtime[b.id].status,
+      currentTask: runtime[b.id].currentTask,
+      lastTaskName: runtime[b.id].lastTaskName,
+      lastTaskTime: runtime[b.id].lastTaskTime.toISOString(),
+      lastTaskStatus: runtime[b.id].lastTaskStatus,
+      weekTasks: runtime[b.id].weekTasks,
+      todayTokens: usage.todayTokens != null ? usage.todayTokens : null,
+      lastSeen: fmtShort(runtime[b.id].lastTaskTime),
+    };
+  });
 
   return {
     ok: true,
@@ -200,17 +204,38 @@ function buildSignalsForDay(dayOffset) {
 }
 
 // ── Token Usage ───────────────────────────────────────────────
+// 统计口径（契约，OpenClaw 那端实现时严格按此）：
+//   - totalTokens   : 累计（从 statPeriod 起至今）input + output 总和
+//   - todayTokens   : 今日 00:00（timezone 时区）起至今的新增
+//   - models[].tokens: 该模型的累计消耗
+//   - models[].pct   : 该模型在 totalTokens 中的占比（整数 0-100）
+//   - bots[].todayTokens : 该 bot 今日消耗（用于首页卡片）
+//   - bots[].totalTokens : 该 bot 累计消耗
 function mockUsage() {
+  // Bot 分摊（今日 + 累计）。洗脑专家和跟班用得最多（业务一致）
+  const bots = [
+    { id: 'main',      todayTokens:  8_200, totalTokens: 192_000 },
+    { id: 'content',   todayTokens: 18_400, totalTokens: 512_300 },
+    { id: 'tech',      todayTokens:  4_100, totalTokens: 128_900 },
+    { id: 'intel',     todayTokens:  6_800, totalTokens: 156_800 },
+    { id: 'assistant', todayTokens: 14_800, totalTokens: 294_500 },
+  ];
+  const todayTokens = bots.reduce((s, b) => s + b.todayTokens, 0);
+  const totalTokens = bots.reduce((s, b) => s + b.totalTokens, 0);
+
   return {
     ok: true,
     usage: {
-      totalTokens: 1_284_500,
-      todayTokens: 52_300,
+      totalTokens,
+      todayTokens,
+      statPeriod: '2026-04-01 起累计',
+      timezone:   'Asia/Shanghai',
       models: [
-        { model: 'Claude Opus 4.6',   tokens: 642_250, pct: 50 },
-        { model: 'Claude Sonnet 4.6', tokens: 385_350, pct: 30 },
-        { model: 'Ling 2.6 1T',       tokens: 256_900, pct: 20 },
+        { model: 'Claude Opus 4.6',   tokens: Math.round(totalTokens * 0.50), pct: 50 },
+        { model: 'Claude Sonnet 4.6', tokens: Math.round(totalTokens * 0.30), pct: 30 },
+        { model: 'Ling 2.6 1T',       tokens: Math.round(totalTokens * 0.20), pct: 20 },
       ],
+      bots,
     },
   };
 }

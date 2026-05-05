@@ -2,6 +2,34 @@
 
 所有值得记录的变更都会出现在这里。
 
+## v3.3.1 — 2026-05-05 · 信号数据源去重修复
+
+### 修复
+- `/api/signals` 过去会把主源 `dashboard-signals.json` 和兜底 `feed-*.json` 的结果**叠加**，导致同一条信号出现多次
+- 归档文件过去会被 `?source=blog` 这类筛选参数污染，导致 `/api/signals/history` 的"旧账"tab 数据残缺
+
+### 改进
+- 新策略：**主源优先 + 兜底按 source 补位** —— 主源覆盖了某个 source（如 x/blog）就不再读对应的兜底文件；主源没有的 source（当前是 podcast）才从兜底补
+- 归档使用全量合并结果，不受前端筛选参数影响
+- PROJECT.md §7.3 重写，明确优先级规则
+
+---
+
+## v3.3.0 — 2026-05-05 · 视觉微调与 Token 口径统一
+
+### 视觉
+- 班底卡片**默认状态**加边框 + 微渐变，不再是一整片纯黑
+- 卡片 hover 时酒红边框 + 外阴影 + 顶部光带，层次更清晰
+
+### Token 用量
+- **口径明确化**：`totalTokens` / `todayTokens` / `statPeriod` / `timezone` 四字段约定
+- **新增 bots[] 契约**：`usage.bots[*].todayTokens` 按 bot 拆分，server 会把它 merge 到 `/api/bots` 的响应
+- **班底卡片新增「今日 Token」行**，无数据时降级显示 —
+- **侧栏 Token 卡加口径说明**（底部小字显示 statPeriod + timezone）
+- PROJECT.md §7.6 新增完整契约文档
+
+---
+
 ## v3.2.0 — 2026-05-04 · 黑帮主题与视觉升级
 
 ### 主题一致化

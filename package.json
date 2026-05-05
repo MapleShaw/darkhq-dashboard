@@ -1,6 +1,6 @@
 {
   "name": "darkhq-dashboard",
-  "version": "3.2.0",
+  "version": "3.3.1",
   "description": "老巢 · OpenClaw 多 Bot 舰队控制台（香港黑帮主题）",
   "main": "server.js",
   "engines": {
