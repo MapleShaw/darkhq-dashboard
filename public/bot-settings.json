@@ -1,9 +1,9 @@
 {
   "bots": [
-    {
-      "id": "main",
-      "name": "老大",
-      "role": "总指挥"
-    }
+    { "id": "main", "name": "老大", "role": "总指挥" },
+    { "id": "content", "name": "洗脑专家", "role": "内容创作" },
+    { "id": "tech", "name": "键盘杀手", "role": "技术运维" },
+    { "id": "intel", "name": "线人", "role": "情报收集" },
+    { "id": "assistant", "name": "跟班", "role": "杂活" }
   ]
 }

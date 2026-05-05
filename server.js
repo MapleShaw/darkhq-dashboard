@@ -9,6 +9,17 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+
+// ── 手动加载 .env（不依赖 dotenv 包）─────────────────────
+try {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, 'utf8').split('\n').forEach((line) => {
+      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+    });
+  }
+} catch (e) { /* .env 不存在也无所谓 */ }
 const fetch = require('node-fetch');
 
 let multer = null;
@@ -407,33 +418,131 @@ app.get('/api/signals/history', async (req, res) => {
   }
 });
 
-// ─── API: Usage ───────────────────────────────────────────
-// 尝试调 OpenClaw gateway 的 /api/usage；gateway 未实现或调不通时，
-// 返回 { ok: true, notConnected: true, reason: '...' }，前端据此显示"未对接"
-// 而不是假数据（以前的硬编码 fallback 会误导用户）
+// ─── API: Usage / Subscription ───────────────────────────
+// /api/subscription  → ZenMux subscription/detail（配额窗口+计费周期）
+// /api/usage         → ZenMux timeseries（模型分布，按计费周期）
+
+const ZENMUX_MGMT_KEY = process.env.ZENMUX_MGMT_KEY;
+const ZENMUX_SUBSCRIPTION_URL = 'https://zenmux.ai/api/v1/management/subscription/detail';
+const ZENMUX_TIMESERIES_URL   = 'https://zenmux.ai/api/v1/management/statistics/timeseries';
+
+async function fetchSubscription() {
+  if (!ZENMUX_MGMT_KEY) throw new Error('ZENMUX_MGMT_KEY not set');
+  const r = await fetch(ZENMUX_SUBSCRIPTION_URL, {
+    headers: { Authorization: `Bearer ${ZENMUX_MGMT_KEY}` },
+    timeout: 5000,
+  });
+  if (!r.ok) throw new Error(`ZenMux subscription API error: ${r.status}`);
+  const j = await r.json();
+  if (!j.success) throw new Error('ZenMux subscription API returned success=false');
+  return j.data; // { plan, quota_5_hour, quota_7_day, quota_monthly, ... }
+}
+
+async function fetchZenMuxUsage() {
+  if (!ZENMUX_MGMT_KEY) throw new Error('ZENMUX_MGMT_KEY not set');
+
+  // 先拿 subscription 获取计费周期起点
+  const sub = await fetchSubscription();
+
+  const expiresAt = new Date(sub.plan.expires_at);
+
+  // 计费周期起点：expires_at 往前推一个月再往前 1 天（避免 T+1 延迟导致起始当天数据空）
+  const periodStart = new Date(expiresAt);
+  periodStart.setMonth(periodStart.getMonth() - 1);
+  periodStart.setDate(periodStart.getDate() - 1);
+  const periodStartISO = periodStart.toISOString();
+  // ending_at 用明天，确保当天数据都纳入
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const nowISO = tomorrow.toISOString();
+
+  const headers = { Authorization: `Bearer ${ZENMUX_MGMT_KEY}` };
+
+  // ZenMux 的 tokens metric 返回空；改用 cost（值单位 millicents，/100000 = USD）
+  const tsRes = await fetch(
+    `${ZENMUX_TIMESERIES_URL}?metric=cost&bucket_width=1d&starting_at=${encodeURIComponent(periodStartISO)}&ending_at=${encodeURIComponent(nowISO)}`,
+    { headers, timeout: 5000 }
+  );
+  if (!tsRes.ok) throw new Error(`ZenMux timeseries API error: ${tsRes.status}`);
+  const tsData = await tsRes.json();
+
+  // ZenMux 格式: { success, data: { series: [{ period, date, models: [{ model, label, value }] }] } }
+  const getSeries = (resp) =>
+    (resp && resp.data && Array.isArray(resp.data.series)) ? resp.data.series : [];
+
+  // value = millicents → USD = / 100000
+  const MC_TO_USD = 100000;
+
+  const totalRaw = getSeries(tsData).reduce((acc, bucket) =>
+    acc + (bucket.models || []).reduce((s, m) => s + (m.value || 0), 0), 0);
+  const totalUSD = (totalRaw / MC_TO_USD).toFixed(2);
+
+  // 按 model 拆分
+  const modelMap = {};
+  getSeries(tsData).forEach((bucket) => {
+    (bucket.models || []).forEach((m) => {
+      const slug = m.model === '__others__' ? 'others' : m.model;
+      if (!modelMap[slug]) modelMap[slug] = { raw: 0, label: m.label || slug };
+      modelMap[slug].raw += (m.value || 0);
+    });
+  });
+
+  const models = Object.entries(modelMap)
+    .map(([id, { raw, label }]) => ({
+      id,
+      model: label,
+      costUSD: parseFloat((raw / MC_TO_USD).toFixed(4)),
+      pct: Math.round((raw / (totalRaw || 1)) * 100),
+    }))
+    .sort((a, b) => b.costUSD - a.costUSD)
+    .slice(0, 10);
+
+  // 格式化计费周期标签（Asia/Shanghai 展示）
+  const fmtDate = (d) => {
+    const sh = new Date(d.getTime() + 8 * 3600 * 1000);
+    return `${sh.getUTCFullYear()}-${String(sh.getUTCMonth()+1).padStart(2,'0')}-${String(sh.getUTCDate()).padStart(2,'0')}`;
+  };
+  const statPeriod = `${fmtDate(periodStart)} → ${fmtDate(expiresAt)}`;
+
+  return {
+    totalUSD,
+    statPeriod,
+    timezone: 'Asia/Shanghai',
+    models,
+    bots: [],
+    subscription: sub,
+  };
+}
+
+// /api/subscription：单独暴露配额窗口数据（前端迷你卡直接调）
+app.get('/api/subscription', async (req, res) => {
+  if (USE_MOCK) {
+    return res.json({ ok: true, data: mockData.mockSubscription ? mockData.mockSubscription() : null });
+  }
+  try {
+    const data = await fetchSubscription();
+    return res.json({ ok: true, data });
+  } catch (e) {
+    console.warn('[subscription] failed:', e.message);
+    return res.json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/api/usage', async (req, res) => {
   if (USE_MOCK) return res.json(mockData.mockUsage());
 
-  const token = getGatewayToken();
-  if (!token) {
-    return res.json({ ok: true, notConnected: true, reason: 'gateway token 不可用（检查 openclaw.json）' });
-  }
   try {
-    const r = await fetch(`${GATEWAY_URL}/api/usage`, {
-      headers: { Authorization: `Bearer ${token}` }, timeout: 2000,
-    });
-    if (!r.ok) {
-      return res.json({ ok: true, notConnected: true, reason: `gateway 返回 ${r.status}（未实现 /api/usage ?）` });
-    }
-    const j = await r.json();
-    const usage = j.usage || j;
-    if (!usage || (usage.totalTokens == null && !Array.isArray(usage.models))) {
-      return res.json({ ok: true, notConnected: true, reason: 'gateway 返回格式不符（见 PROJECT.md §7.6）' });
-    }
-    return res.json({ ok: true, usage });
+    const usage = await fetchZenMuxUsage();
+    return res.json({ ok: true, usage, source: 'zenmux' });
   } catch (e) {
-    return res.json({ ok: true, notConnected: true, reason: `gateway 连接失败：${e.message}` });
+    console.warn('[usage] ZenMux API failed:', e.message);
   }
+
+  return res.json({
+    ok: true,
+    notConnected: true,
+    reason: 'ZenMux API 调用失败，请检查 ZENMUX_MGMT_KEY 配置',
+  });
 });
 
 // ─── API: Docs ────────────────────────────────────────────

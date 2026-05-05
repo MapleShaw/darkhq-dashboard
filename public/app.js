@@ -149,8 +149,8 @@ function renderBotCard(bot) {
 
   const tokenLine = `
     <div class="bot-card-meta-row">
-      <span class="key">今日 Token</span>
-      <span class="val mono">${bot.todayTokens != null ? fmtNum(bot.todayTokens) : '—'}</span>
+      <span class="key">本月 Token</span>
+      <span class="val mono">${bot.monthTokens != null ? fmtNum(bot.monthTokens) : (bot.todayTokens != null ? fmtNum(bot.todayTokens) : '—')}</span>
     </div>`;
 
   return `
@@ -320,48 +320,67 @@ function renderHeartbeat(data) {
   if (st) st.style.color = data.gatewayOnline ? '#5bffa8' : '#ff9aa0';
 }
 
-// ── Token 用量迷你卡 ─────────────────────────────
+// ── Token 用量迷你卡（配额进度条版）────────────────
+// 调 /api/subscription 只拿配额窗口，轻量快速
 async function loadTokenMini() {
   const host = document.getElementById('token-mini');
   if (!host) return;
   try {
-    const data = await fetch('/api/usage').then((r) => r.json());
-    if (data.notConnected) {
-      host.innerHTML = `
-        <div style="padding:0.6rem 0;font-size:0.82rem;color:var(--text-2)">
-          <div style="color:var(--warn);margin-bottom:0.3rem">⚠ 未对接</div>
-          <div style="font-size:0.75rem;color:var(--text-3);line-height:1.5">
-            ${esc(data.reason || 'Gateway 未暴露 /api/usage')}
-          </div>
-          <div style="font-size:0.72rem;color:var(--text-3);margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--line)">
-            对接方式见 PROJECT.md §7.6
-          </div>
-        </div>`;
+    const data = await fetch('/api/subscription').then((r) => r.json());
+    if (!data.ok || !data.data) {
+      host.innerHTML = `<div style="font-size:0.8rem;color:var(--warn);padding:0.6rem 0">⚠ ${esc(data.error || '未对接')}</div>`;
       return;
     }
-    const u = data.usage || {};
-    const models = u.models || [];
-    const total = u.totalTokens || 0;
-    const period = u.statPeriod ? esc(u.statPeriod) : '累计';
-    const tz = u.timezone ? esc(u.timezone) : '本地时区';
+    const d = data.data;
+    const q5  = d.quota_5_hour  || {};
+    const q7  = d.quota_7_day   || {};
+    const plan = d.plan || {};
+
+    const pct5  = Math.min(100, Math.round((q5.usage_percentage  || 0) * 100));
+    const pct7  = Math.min(100, Math.round((q7.usage_percentage  || 0) * 100));
+
+    // 剩余 flows 格式化
+    const fmtFlows = (v) => v != null ? (v >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v).toString()) : '—';
+    // 重置时间：只显示 HH:MM 或「明日 HH:MM」
+    const fmtReset = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const sh = new Date(d.getTime() + 8 * 3600 * 1000);
+      const now = new Date(Date.now() + 8 * 3600 * 1000);
+      const prefix = sh.getUTCDate() !== now.getUTCDate() ? '明日 ' : '';
+      return prefix + String(sh.getUTCHours()).padStart(2,'0') + ':' + String(sh.getUTCMinutes()).padStart(2,'0');
+    };
+
+    // 进度条颜色：用量高时变红
+    const barColor = (pct) => pct >= 90 ? '#ff4d4d' : pct >= 70 ? '#e08a00' : 'var(--accent)';
+
     host.innerHTML = `
-      <div class="token-mini-top">
-        <span class="total">${fmtNum(total)}</span>
-        <span class="today">今日 <strong>${fmtNum(u.todayTokens || 0)}</strong></span>
+      <div class="quota-row">
+        <div class="quota-label">
+          <span>5h 窗口</span>
+          <span class="quota-meta">${fmtFlows(q5.remaining_flows)} 剩余 · 重置 ${fmtReset(q5.resets_at)}</span>
+        </div>
+        <div class="quota-bar-wrap">
+          <div class="quota-bar-track">
+            <div class="quota-bar-fill" style="width:${pct5}%;background:${barColor(pct5)}"></div>
+          </div>
+          <span class="quota-pct">${pct5}%</span>
+        </div>
       </div>
-      <div class="token-bar-stack">
-        ${models.map((m, i) => `<div class="token-bar-seg s${i}" style="width:${m.pct}%"></div>`).join('')}
+      <div class="quota-row">
+        <div class="quota-label">
+          <span>7d 窗口</span>
+          <span class="quota-meta">${fmtFlows(q7.remaining_flows)} 剩余 · 重置 ${fmtReset(q7.resets_at)}</span>
+        </div>
+        <div class="quota-bar-wrap">
+          <div class="quota-bar-track">
+            <div class="quota-bar-fill" style="width:${pct7}%;background:${barColor(pct7)}"></div>
+          </div>
+          <span class="quota-pct">${pct7}%</span>
+        </div>
       </div>
-      <div class="token-model">
-        ${models.map((m, i) => `
-          <div class="token-model-row">
-            <span><span class="token-bar-seg s${i}" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:0.4rem;vertical-align:middle"></span>${esc(m.model)}</span>
-            <span class="n">${fmtNum(m.tokens)} · ${m.pct}%</span>
-          </div>`).join('')}
-      </div>
-      <div style="font-size:0.68rem;color:var(--text-3);padding-top:0.6rem;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:0.4rem;flex-wrap:wrap">
-        <span>口径：${period}</span>
-        <span>${tz}</span>
+      <div style="font-size:0.68rem;color:var(--text-3);margin-top:0.6rem;padding-top:0.5rem;border-top:0.5px solid var(--line)">
+        ${plan.tier ? `<span style="text-transform:uppercase;letter-spacing:0.05em">${esc(plan.tier)}</span> · ` : ''}到期 ${plan.expires_at ? esc(new Date(new Date(plan.expires_at).getTime()+8*3600000).toISOString().slice(0,10)) : '—'}
       </div>`;
   } catch (e) {
     host.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
