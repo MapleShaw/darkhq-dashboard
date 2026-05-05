@@ -255,13 +255,45 @@ curl -X POST http://localhost:9700/api/cron/signal-radar/runs \
 
 Dashboard 自动按 `{jobId}/{timestamp}.json` 归档，读取时返回最新 10 条。**这是最小对接，强烈建议做**。
 
-### 7.3 ✅ Signal Radar（已对接）
+### 7.3 ✅ Signal Radar（已对接，2026-05 升级）
 
-Dashboard 直接读 `workspace/content-signal-radar/feed-{blogs,x,podcasts}.json`，不用改 OpenClaw。
+Dashboard 现在同时支持两种数据源，优先使用新的：
 
-归档是**被动**的 —— 每次 `/api/signals` 被访问时自动把当前数据写到 `data/signals-archive/{YYYY-MM-DD}.json`。
+**主要来源（推荐）：`content-signal-radar/dashboard-signals.json`**
 
-**建议**：如果担心没人访问导致漏归档，可以让 OpenClaw 的 signal-radar 任务跑完后加一行：
+由 `prepare-digest.js` 每次运行后自动写出（cron job 每天 15:30 跑）。包含即刻、RSS 博客、X 推文的全量高信号，无需 API key。
+
+数据结构：
+```json
+{
+  "generatedAt": "2026-05-05T07:30:00.000Z",
+  "stats": { ... },
+  "signals": [
+    {
+      "id": "https://x.com/user/status/123",
+      "source": "x",              // "x" | "blog" | "podcast"
+      "sourceName": "Zara Zhang",
+      "handle": "zarazhangrui",   // 仅 x 有
+      "title": "...",
+      "url": "https://...",
+      "summary": "...",
+      "score": 82,                // 0-100，prepare-digest 的 scoring.total * 100
+      "publishedAt": "2026-05-04T06:48:41.000Z",
+      "topic": "product_signal",  // signalIntent 字段
+      "needsReview": false,
+      "reviewNote": null
+    }
+  ]
+}
+```
+
+**降级来源（兜底）：`feed-{blogs,x,podcasts}.json`**
+
+由 `generate-feed.js`（GitHub Actions）生成，需要 `X_BEARER_TOKEN` + `SUPADATA_API_KEY`。如果没配 secrets，x 和 podcast 会是空的，只有 blog 有内容。
+
+**归档**：每次 `/api/signals` 被访问时自动存一份 `data/signals-archive/{YYYY-MM-DD}.json`。
+
+**建议**：让 signal-radar cron job 跑完后顺手 touch 一下归档：
 ```bash
 curl -s http://localhost:9700/api/signals > /dev/null
 ```
@@ -392,7 +424,8 @@ sudo journalctl -u darkhq-dashboard -f
 ## 10. 待办
 
 - [ ] §7.1 Bot 运行时状态对接
-- [ ] §7.2 例牌运行历史回写
+- [ ] §7.2 例牌运行历史回写（cron job prompt 已加 curl 回写指令，等明天验证）
+- [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
 - [ ] §7.5 档案目录约定
 - [ ] 卷宗支持全文搜索
 - [ ] 权限控制（现在完全裸奔）

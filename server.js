@@ -261,6 +261,26 @@ app.get('/api/signals', (req, res) => {
     } catch (e) {}
   };
 
+  // 优先读 prepare-digest.js 写出的 dashboard-signals.json（含即刻/RSS 全部高信号）
+  try {
+    const dashData = safeReadJson(path.join(SIGNAL_DIR, 'dashboard-signals.json'), null);
+    if (dashData && Array.isArray(dashData.signals)) {
+      dashData.signals.forEach((item) => signals.push({
+        id: item.id || item.url,
+        source: item.source,
+        sourceName: item.sourceName || item.handle || '',
+        title: item.title,
+        url: item.url,
+        summary: item.summary || '',
+        reason: item.reviewNote || (item.topic ? `[${item.topic}]` : '高信号内容'),
+        score: item.score || 70,
+        publishedAt: item.publishedAt || dashData.generatedAt,
+        generatedAt: dashData.generatedAt,
+        needsReview: item.needsReview || false,
+      }));
+    }
+  } catch (e) {}
+
   readFeed('feed-blogs.json', 'blogs', (item, data) => ({
     id: item.url, source: 'blog', sourceName: item.name || 'Blog',
     title: item.title, url: item.url,
