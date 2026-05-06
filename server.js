@@ -426,8 +426,16 @@ const ZENMUX_MGMT_KEY = process.env.ZENMUX_MGMT_KEY;
 const ZENMUX_SUBSCRIPTION_URL = 'https://zenmux.ai/api/v1/management/subscription/detail';
 const ZENMUX_TIMESERIES_URL   = 'https://zenmux.ai/api/v1/management/statistics/timeseries';
 
+// 5 分钟服务端缓存，避免每次页面加载都打外网 API
+const ZENMUX_CACHE_TTL_MS = 5 * 60 * 1000;
+let _zenmuxUsageCache    = null;
+let _zenmuxUsageCacheAt  = 0;
+let _zenmuxSubCache      = null;
+let _zenmuxSubCacheAt    = 0;
+
 async function fetchSubscription() {
   if (!ZENMUX_MGMT_KEY) throw new Error('ZENMUX_MGMT_KEY not set');
+  if (_zenmuxSubCache && Date.now() - _zenmuxSubCacheAt < ZENMUX_CACHE_TTL_MS) return _zenmuxSubCache;
   const r = await fetch(ZENMUX_SUBSCRIPTION_URL, {
     headers: { Authorization: `Bearer ${ZENMUX_MGMT_KEY}` },
     timeout: 5000,
@@ -435,11 +443,14 @@ async function fetchSubscription() {
   if (!r.ok) throw new Error(`ZenMux subscription API error: ${r.status}`);
   const j = await r.json();
   if (!j.success) throw new Error('ZenMux subscription API returned success=false');
+  _zenmuxSubCache = j.data;
+  _zenmuxSubCacheAt = Date.now();
   return j.data; // { plan, quota_5_hour, quota_7_day, quota_monthly, ... }
 }
 
 async function fetchZenMuxUsage() {
   if (!ZENMUX_MGMT_KEY) throw new Error('ZENMUX_MGMT_KEY not set');
+  if (_zenmuxUsageCache && Date.now() - _zenmuxUsageCacheAt < ZENMUX_CACHE_TTL_MS) return _zenmuxUsageCache;
 
   // 先拿 subscription 获取计费周期起点
   const sub = await fetchSubscription();
@@ -504,7 +515,7 @@ async function fetchZenMuxUsage() {
   };
   const statPeriod = `${fmtDate(periodStart)} → ${fmtDate(expiresAt)}`;
 
-  return {
+  const result = {
     totalUSD,
     statPeriod,
     timezone: 'Asia/Shanghai',
@@ -512,6 +523,9 @@ async function fetchZenMuxUsage() {
     bots: [],
     subscription: sub,
   };
+  _zenmuxUsageCache = result;
+  _zenmuxUsageCacheAt = Date.now();
+  return result;
 }
 
 // /api/subscription：单独暴露配额窗口数据（前端迷你卡直接调）
