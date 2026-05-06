@@ -63,7 +63,7 @@
               班底身份
               <button class="btn primary sm" onclick="saveAllBots()">保存</button>
             </div>
-            <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:1rem">
+            <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:0.5rem">
               <div class="loading">载入中…</div>
             </div>
             <div id="bot-save-msg" style="margin-top:0.8rem;font-size:0.8rem;text-align:right;min-height:1.2rem"></div>
@@ -128,24 +128,13 @@ async function loadBots(){
       const role=s.role||bot.role;
       const avatar=bot.avatarUrl||`/avatars/bot-${bot.id}.png`;
       return `
-      <div style="display:flex;gap:1rem;align-items:flex-start;padding:0.9rem;background:var(--bg-2);border-radius:var(--r-md)">
-        <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--bg-3);flex-shrink:0;border:1px solid var(--line)">
+      <div style="display:flex;gap:0.7rem;align-items:center;padding:0.55rem 0.8rem;background:var(--bg-2);border-radius:var(--r-md)">
+        <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--bg-3);flex-shrink:0;border:1px solid var(--line)">
           <img src="${esc(avatar)}" alt="${esc(bot.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:0.6rem;min-width:0">
-          <div>
-            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">显示名称</label>
-            <input type="text" class="input bot-name-input" data-id="${esc(bot.id)}" value="${esc(name)}">
-          </div>
-          <div>
-            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">角色描述</label>
-            <input type="text" class="input bot-role-input" data-id="${esc(bot.id)}" value="${esc(role)}">
-          </div>
-          <div style="display:flex;gap:1rem;font-size:0.72rem;color:var(--text-3);font-family:var(--font-mono)">
-            <span>ID: ${esc(bot.id)}</span>
-            <span>模型: ${esc(bot.model)}</span>
-          </div>
-        </div>
+        <input type="text" class="input bot-name-input" data-id="${esc(bot.id)}" value="${esc(name)}" placeholder="名称" style="width:5.5rem;flex-shrink:0">
+        <input type="text" class="input bot-role-input" data-id="${esc(bot.id)}" value="${esc(role)}" placeholder="角色" style="flex:1;min-width:0">
+        <span style="font-size:0.68rem;color:var(--text-3);font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">${esc(bot.model)}</span>
       </div>`;
     }).join('');
 
