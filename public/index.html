@@ -114,7 +114,10 @@
           <section class="card">
             <div class="card-title">
               Token 用量
-              <a href="/usage.html" class="meta">详情 →</a>
+              <div style="display:flex;align-items:center;gap:0.6rem">
+                <button class="receipt-btn" id="receipt-btn" onclick="showReceipt()" title="打印小票">🧾 打单</button>
+                <a href="/settings.html" class="meta">详情 →</a>
+              </div>
             </div>
             <div class="token-mini" id="token-mini">
               <div class="loading">载入中…</div>
@@ -139,5 +142,15 @@
 
 <script src="rail.js"></script>
 <script src="app.js"></script>
+<!-- ── Receipt Modal ─────────────────────────────────── -->
+<div class="receipt-overlay" id="receipt-overlay" onclick="closeReceipt(event)">
+  <div class="receipt-modal">
+    <pre class="receipt-paper" id="receipt-paper">载入中…</pre>
+    <div class="receipt-actions">
+      <button onclick="copyReceipt()">复制</button>
+      <button onclick="document.getElementById('receipt-overlay').classList.remove('open')">关闭</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

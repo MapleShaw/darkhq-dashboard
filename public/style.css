@@ -13,7 +13,7 @@
 
   --text:    #e6e6eb;
   --text-2:  #9a9aa6;
-  --text-3:  #5a5a66;
+  --text-3:  #7e7e8e;
 
   --line:    rgba(255,255,255,0.06);
   --line-2:  rgba(255,255,255,0.10);
@@ -169,7 +169,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 }
 .topbar-left { display: flex; align-items: baseline; gap: 0.6rem; }
 .topbar-title { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
-.topbar-sub { font-size: 0.75rem; color: var(--text-3); }
+.topbar-sub { font-size: 0.75rem; color: var(--text-2); }
 .topbar-right { display: flex; align-items: center; gap: 0.75rem; }
 
 .status-chip {
@@ -451,11 +451,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 .cron-row.open .cron-row-detail { max-height: 600px; }
 .cron-row-detail-inner {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;
-  padding: 0.9rem 0.9rem 0.6rem 1.6rem;
-  margin-top: 0.3rem;
-  border-left: 2px solid var(--accent-soft);
-  background: rgba(255,255,255,0.015);
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 0.8rem 0 0.4rem;
 }
 .detail-field label {
   display: block; font-size: 0.68rem;
@@ -951,49 +947,87 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 .token-bar-seg.s0 { background: var(--accent); }
 .token-bar-seg.s1 { background: #e04850; opacity: 0.7; }
 .token-bar-seg.s2 { background: #7b1e2d; }
-/* ── Quota Progress Bars (迷你卡) ─────────────────────── */
-.quota-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.quota-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 0.75rem;
+
+/* ── Receipt Button ────────────────────────────────────── */
+.receipt-btn {
+  background: none;
+  border: 1px solid var(--line);
   color: var(--text-2);
-}
-.quota-meta {
-  font-size: 0.68rem;
-  color: var(--text-3);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  cursor: pointer;
   font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  transition: border-color 0.15s, color 0.15s;
 }
-.quota-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.quota-bar-track {
-  flex: 1;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--bg-3);
-  overflow: hidden;
-}
-.quota-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-.quota-pct {
-  font-size: 0.68rem;
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  min-width: 2.4rem;
-  text-align: right;
+.receipt-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
+/* ── Receipt Modal ────────────────────────────────────── */
+.receipt-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 9000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.receipt-overlay.open {
+  display: flex;
+}
+.receipt-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.receipt-paper {
+  background: #f7f4ee;
+  color: #1a1a1a;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 2rem 1.6rem 1.6rem;
+  width: 380px;
+  max-width: 92vw;
+  white-space: pre;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 1px 0 #ccc inset;
+  /* jagged top edge */
+  clip-path: polygon(
+    0% 6px, 4% 0%, 8% 6px, 12% 0%, 16% 6px, 20% 0%, 24% 6px,
+    28% 0%, 32% 6px, 36% 0%, 40% 6px, 44% 0%, 48% 6px, 52% 0%,
+    56% 6px, 60% 0%, 64% 6px, 68% 0%, 72% 6px, 76% 0%, 80% 6px,
+    84% 0%, 88% 6px, 92% 0%, 96% 6px, 100% 0%,
+    100% 100%, 0% 100%
+  );
+  padding-top: 2.4rem;
+}
+.receipt-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+.receipt-actions button {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.7);
+  font-size: 0.78rem;
+  padding: 0.35rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: border-color 0.15s, color 0.15s;
+}
+.receipt-actions button:hover {
+  border-color: rgba(255,255,255,0.6);
+  color: #fff;
+}
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
