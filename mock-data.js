@@ -241,7 +241,10 @@ function mockUsage() {
 }
 
 // ── Docs（会话日志 memory + 整理文档 docs）──────────────────
-function mockDocs(type, filterBot) {
+function mockDocs(type, filterBot, page, size) {
+  page = Math.max(1, parseInt(page, 10) || 1);
+  size = Math.min(100, Math.max(1, parseInt(size, 10) || 20));
+
   if (type === 'memory') {
     const days = ['2026-05-04', '2026-05-03', '2026-05-02', '2026-05-01', '2026-04-30', '2026-04-29', '2026-04-28'];
     const list = days.map((d) => ({
@@ -253,7 +256,11 @@ function mockDocs(type, filterBot) {
       size: 8_400 + Math.floor(Math.random() * 4_000),
       preview: `# ${d} 聊天记录\n\n## 摘要\n- 老大处理了 5 个主线差事\n- 洗脑专家输出 3 篇文章草稿\n- 线人扫探 12 个来源`,
     }));
-    return { ok: true, docs: filterBot ? [] : list };
+    const fullList = filterBot ? [] : list;
+    const total = fullList.length;
+    const totalPages = Math.max(1, Math.ceil(total / size));
+    const slice = fullList.slice((page - 1) * size, page * size);
+    return { ok: true, docs: slice, total, page, size, totalPages };
   }
 
   if (type === 'docs') {
@@ -267,15 +274,12 @@ function mockDocs(type, filterBot) {
       { id: 'd-model-benchmark',      title: 'Claude vs Ling 内部评测',           botId: 'tech',     createdAt: new Date('2026-04-28T15:45:00').toISOString() },
       { id: 'd-viral-posts-apr',      title: '4 月爆款内容复盘',                  botId: 'content',  createdAt: new Date('2026-04-28T11:00:00').toISOString() },
     ];
-    const list = (filterBot && filterBot !== 'all') ? docs.filter((d) => d.botId === filterBot) : docs;
-    return {
-      ok: true,
-      docs: list.map((d) => ({
-        ...d,
-        type: 'docs',
-        size: 3_200 + Math.floor(Math.random() * 6_000),
-      })),
-    };
+    const fullList = ((filterBot && filterBot !== 'all') ? docs.filter((d) => d.botId === filterBot) : docs)
+      .map((d) => ({ ...d, type: 'docs', size: 3_200 + Math.floor(Math.random() * 6_000) }));
+    const total = fullList.length;
+    const totalPages = Math.max(1, Math.ceil(total / size));
+    const slice = fullList.slice((page - 1) * size, page * size);
+    return { ok: true, docs: slice, total, page, size, totalPages };
   }
 
   return { ok: false, error: 'unknown doc type' };
@@ -510,6 +514,23 @@ function mockDocContent(id) {
   return { ok: true, id, body };
 }
 
+function mockUsageTrend() {
+  const trend = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    // 模拟每日花费 0.02 ~ 0.80 USD，周末略低
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const base = isWeekend ? 0.08 : 0.18;
+    const rand = Math.random() * 0.55;
+    const costUSD = parseFloat((base + rand).toFixed(4));
+    trend.push({ date, costUSD });
+  }
+  return { ok: true, trend };
+}
+
 module.exports = {
   BOT_META,
   CRON_DEFS,
@@ -519,6 +540,7 @@ module.exports = {
   mockSignals,
   mockSignalsHistory,
   mockUsage,
+  mockUsageTrend,
   mockDocs,
   mockDocContent,
 };

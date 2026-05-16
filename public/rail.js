@@ -46,4 +46,30 @@
   }
 
   document.querySelectorAll('aside.rail').forEach(renderRail);
+
+  // ── 移动端底部 tab bar ──────────────────────────────────
+  const BOTTOM_TABS = [
+    { key: 'dashboard', href: '/',             label: '堂口', icon: '🏴' },
+    { key: 'cron',      href: '/cron.html',    label: '日程', icon: '📅' },
+    { key: 'signals',   href: '/signals.html', label: '风声', icon: '📡' },
+    { key: 'docs',      href: '/docs.html',    label: '卷宗', icon: '📂' },
+    { key: 'settings',  href: '/settings.html', label: '设置', icon: '⚙️' },
+  ];
+
+  function renderBottomNav() {
+    // Determine active page from the rail data-active attribute
+    const rail = document.querySelector('aside.rail');
+    const active = (rail && rail.dataset.active) || '';
+
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    nav.innerHTML = BOTTOM_TABS.map((tab) => `
+      <a class="bottom-nav-item ${tab.key === active ? 'active' : ''}" href="${tab.href}">
+        <span class="bottom-nav-icon">${tab.icon}</span>
+        <span>${tab.label}</span>
+      </a>`).join('');
+    document.body.appendChild(nav);
+  }
+
+  renderBottomNav();
 })();

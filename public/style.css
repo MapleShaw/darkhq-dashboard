@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────
-   老巢控制台 · v3.1 · Dark Fintech + 黑帮皮
+   老巢控制台 · v3.3 · Dark Fintech + 黑帮皮
    ───────────────────────────────────────────────────────────── */
 
 /* ── Reset & Tokens ──────────────────────────────────────── */
@@ -610,11 +610,18 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   min-height: calc(100vh - var(--topbar-h) - 4rem);
 }
 .doc-list {
+  display: flex;
+  flex-direction: column;
   background: var(--bg-1);
   border-radius: var(--r-lg);
-  padding: 0.75rem;
-  overflow-y: auto;
+  overflow: hidden;
   max-height: calc(100vh - var(--topbar-h) - 4rem);
+}
+/* 内层列表区可滚动 */
+.doc-list-inner {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
 }
 .doc-item {
   padding: 0.75rem 0.9rem;
@@ -967,15 +974,35 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 }
 
 /* ── Receipt Modal ────────────────────────────────────── */
+@keyframes receipt-feed {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 1200px; opacity: 1; }
+}
+@keyframes printer-shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-1px); }
+  75%      { transform: translateX(1px); }
+}
+@keyframes receipt-done-pop {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-6px); }
+  70%  { transform: translateY(2px); }
+  100% { transform: translateY(0); }
+}
+
 .receipt-overlay {
   display: none;
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.72);
   z-index: 9000;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   backdrop-filter: blur(3px);
+  padding-top: 5vh;
+  padding-bottom: 5vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .receipt-overlay.open {
   display: flex;
@@ -984,34 +1011,128 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  max-height: 92vh;
-  overflow-y: auto;
+  gap: 0;
+  /* 不限高，让纸张自然撑开；overlay 加 padding-bottom 防贴底 */
+  max-height: none;
+  overflow: visible;
 }
+
+/* 打印机机身 */
+.receipt-modal::before {
+  content: '';
+  display: block;
+  width: 260px;
+  max-width: 92vw;
+  height: 42px;
+  background: linear-gradient(180deg, #2a2a32 0%, #1e1e26 100%);
+  border-radius: 6px 6px 0 0;
+  border: 1px solid #3a3a44;
+  border-bottom: none;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+  position: relative;
+  z-index: 2;
+}
+/* 打印机指示灯 */
+.receipt-modal::after {
+  content: '';
+  display: block;
+  width: 260px;
+  max-width: 92vw;
+  height: 8px;
+  background: linear-gradient(90deg, #1e1e26 30%, #3a3a44 50%, #1e1e26 70%);
+  border-left: 1px solid #3a3a44;
+  border-right: 1px solid #3a3a44;
+  position: relative;
+  margin-top: -8px;
+  z-index: 3;
+}
+
+/* 打印中：机身震动 */
+.receipt-modal.receipt-printing::before {
+  animation: printer-shake 0.12s ease-in-out infinite;
+}
+
+/* 指示灯 — 打印中绿色闪烁 */
+.receipt-printer-light {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5bffa8;
+  box-shadow: 0 0 6px #5bffa8;
+  z-index: 10;
+  pointer-events: none;
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.15; }
+}
+.receipt-printing .receipt-printer-light { animation: blink 0.4s ease-in-out infinite; }
+.receipt-done    .receipt-printer-light { background: #5bffa8; box-shadow: 0 0 6px #5bffa8; }
+
+/* 纸张从机身下方吐出 */
 .receipt-paper {
   background: #f7f4ee;
   color: #1a1a1a;
   font-family: 'Courier New', Courier, monospace;
   font-size: 0.78rem;
   line-height: 1.55;
-  padding: 2rem 1.6rem 1.6rem;
+  padding: 0.6rem 1.6rem 1.6rem;
   width: 380px;
   max-width: 92vw;
-  white-space: pre;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 1px 0 #ccc inset;
-  /* jagged top edge */
-  clip-path: polygon(
-    0% 6px, 4% 0%, 8% 6px, 12% 0%, 16% 6px, 20% 0%, 24% 6px,
-    28% 0%, 32% 6px, 36% 0%, 40% 6px, 44% 0%, 48% 6px, 52% 0%,
-    56% 6px, 60% 0%, 64% 6px, 68% 0%, 72% 6px, 76% 0%, 80% 6px,
-    84% 0%, 88% 6px, 92% 0%, 96% 6px, 100% 0%,
-    100% 100%, 0% 100%
-  );
-  padding-top: 2.4rem;
+  /* pre 不换行，用 pre-wrap 保留格式同时允许折行防横溢 */
+  white-space: pre-wrap;
+  word-break: break-all;
+  box-shadow: 2px 4px 16px rgba(0,0,0,0.5);
+  overflow: hidden;
+  overflow-x: hidden;
+  max-height: 0;
+  opacity: 0;
+  clip-path: none;
+  border-radius: 0 0 2px 2px;
+  position: relative;
+  z-index: 1;
 }
+
+/* 打印中：纸张从机身下方吐出 */
+.receipt-printing .receipt-paper {
+  opacity: 1;
+  /* 只在打印中用 max-height 动画制造吐纸效果 */
+  animation: receipt-feed 0.35s ease-out forwards;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 打印完成：撑开到自然高度，不裁剪，不回缩 */
+.receipt-done .receipt-paper {
+  max-height: none;
+  height: auto;
+  opacity: 1;
+  overflow: visible;
+  overflow-x: hidden;
+  animation: receipt-done-pop 0.35s ease-out;
+  /* 底部锯齿边 */
+  clip-path: polygon(
+    0% 0%, 100% 0%,
+    100% calc(100% - 6px),
+    96% 100%, 92% calc(100% - 6px), 88% 100%, 84% calc(100% - 6px),
+    80% 100%, 76% calc(100% - 6px), 72% 100%, 68% calc(100% - 6px),
+    64% 100%, 60% calc(100% - 6px), 56% 100%, 52% calc(100% - 6px),
+    48% 100%, 44% calc(100% - 6px), 40% 100%, 36% calc(100% - 6px),
+    32% 100%, 28% calc(100% - 6px), 24% 100%, 20% calc(100% - 6px),
+    16% 100%, 12% calc(100% - 6px), 8% 100%, 4% calc(100% - 6px),
+    0% 100%
+  );
+  padding-bottom: 2rem;
+}
+
 .receipt-actions {
   display: flex;
   gap: 0.8rem;
+  margin-top: 1rem;
 }
 .receipt-actions button {
   background: none;
@@ -1036,4 +1157,67 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   .page { padding: 1rem; }
   .cron-head, .cron-row { grid-template-columns: 1fr auto auto; font-size: 0.78rem; }
   .cron-time, .cron-row > div:nth-child(4) { display: none; }
+}
+
+/* ── Pagination ─────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.5rem;
+  border-top: 1px solid var(--line);
+  background: var(--bg-1);
+  flex-shrink: 0;
+}
+.pagination .btn.ghost.sm {
+  color: var(--text-2);
+  border-color: var(--line);
+  min-width: 3.5rem;
+}
+.pagination .btn.ghost.sm:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.pagination .btn.ghost.sm:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.pagination-info {
+  font-size: 0.75rem;
+  color: var(--text-3);
+  min-width: 6rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ── 移动端底部导航 ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  .rail { display: none; }
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(17,17,20,0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    z-index: 100;
+    padding: 0.3rem 0 env(safe-area-inset-bottom, 0.3rem);
+  }
+  .bottom-nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 0.2rem;
+    padding: 0.4rem 0;
+    text-decoration: none; color: var(--text-3);
+    font-size: 0.6rem;
+  }
+  .bottom-nav-item.active { color: var(--accent-2); }
+  .bottom-nav-icon { font-size: 1.2rem; line-height: 1; }
+  /* 给 main 内容加底部 padding 避免被 nav 遮住 */
+  .page { padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0)); }
+}
+/* 桌面端隐藏 bottom-nav */
+@media (min-width: 641px) {
+  .bottom-nav { display: none; }
 }

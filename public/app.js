@@ -1,4 +1,4 @@
-/* 老巢控制台 · app.js v3.2 · 仅负责 index.html 业务 */
+/* 老巢控制台 · app.js v3.3 · 仅负责 index.html 业务 */
 
 // ── 时钟 ──────────────────────────────────────────────
 function updateClock() {
@@ -150,7 +150,9 @@ function renderBotCard(bot) {
   const tokenLine = `
     <div class="bot-card-meta-row">
       <span class="key">今日 Token</span>
-      <span class="val mono">${bot.todayTokens != null ? fmtNum(bot.todayTokens) : '—'}</span>
+      <span class="val mono" ${bot.todayTokens == null ? 'title="ZenMux API 无 per-agent 统计，需 gateway 侧自行实现"' : ''}>
+        ${bot.todayTokens != null ? fmtNum(bot.todayTokens) : '<span style="color:var(--text-3);font-size:0.75em">— 暂无数据</span>'}
+      </span>
     </div>`;
 
   return `
@@ -344,7 +346,6 @@ async function loadTokenMini() {
           ? `<span class="total">${totalUSD}</span>`
           : `<span class="total">${fmtNum(total)}</span>`
         }
-        <span class="today">指标：${period}</span>
       </div>
       <div class="token-bar-stack">
         ${models.map((m, i) => `<div class="token-bar-seg s${i}" style="width:${m.pct}%"></div>`).join('')}
@@ -367,14 +368,20 @@ async function loadTokenMini() {
 
 // ── Token Receipt ──────────────────────────────────────────────
 
-const RECEIPT_LOGO = [
+const RECEIPT_LOGO_LINES = [
 '      ██████       ',
 '   ██████████████  ',
 '   ██  ███  █████  ',
 '   ██████████████  ',
 '   ██  ▀▀▀  █████  ',
 '   ▝▀▀▀▀▀▀▀▀▀▀▀▘  ',
-].join('\n');
+];
+function buildLogoBlock(W = 46) {
+  return RECEIPT_LOGO_LINES.map(l => {
+    const pad = Math.floor((W - l.length) / 2);
+    return ' '.repeat(Math.max(0, pad)) + l;
+  }).join('\n');
+}
 
 const RECEIPT_FOOTERS = [
   'QUOTA IS NOT BUDGET. BUDGET IS VIBES.',
@@ -387,19 +394,26 @@ const RECEIPT_FOOTERS = [
   'THE LOGO LOOKS CALM. THE BILL DOES NOT.',
 ];
 
+// 计算字符串的视觉宽度（CJK 字符算 2 宽）
+function rcptWidth(s) {
+  let w = 0;
+  for (const c of s) { w += (c.charCodeAt(0) > 0x7f) ? 2 : 1; }
+  return w;
+}
 function rcptLine(left, right, W = 46) {
-  const gap = W - left.length - right.length;
+  const gap = W - rcptWidth(left) - rcptWidth(right);
   if (gap <= 0) return left + ' ' + right;
   return left + ' '.repeat(gap) + right;
 }
 function rcptHr(ch = '━', W = 46) { return ch.repeat(W); }
 function rcptCenter(s, W = 46) {
-  if (s.length >= W) return s;
-  const pad = Math.floor((W - s.length) / 2);
+  const vw = rcptWidth(s);
+  if (vw >= W) return s;
+  const pad = Math.floor((W - vw) / 2);
   return ' '.repeat(pad) + s;
 }
 function rcptBar(pct, width = 20) {
-  const f = Math.round(pct * width);
+  const f = pct > 0 ? Math.max(1, Math.round(pct * width)) : 0;
   return '█'.repeat(f) + '░'.repeat(width - f);
 }
 function rcptBarcode(seed, W = 46) {
@@ -429,7 +443,7 @@ function buildReceipt(u) {
   const rows = [];
 
   // Logo + header
-  rows.push(RECEIPT_LOGO);
+  rows.push(buildLogoBlock(W));
   rows.push('');
   rows.push(rcptCenter('老巢指挥部', W));
   rows.push(rcptCenter('DARK HQ COMMAND', W));
@@ -487,21 +501,62 @@ function buildReceipt(u) {
 async function showReceipt() {
   const overlay = document.getElementById('receipt-overlay');
   const paper = document.getElementById('receipt-paper');
+  const modal = overlay.querySelector('.receipt-modal');
+
+  // 重置状态
+  overlay.classList.remove('open');
+  paper.textContent = '';
+  modal.classList.remove('receipt-printing', 'receipt-done');
+
+  // 先显示打印机外壳
   overlay.classList.add('open');
-  paper.textContent = '打印中…';
+  modal.classList.add('receipt-printing');
+
   try {
     const data = _usageCache
       ? { usage: _usageCache }
       : await fetch('/api/usage').then((r) => r.json());
-    paper.textContent = buildReceipt(data.usage || data);
+    const receiptText = buildReceipt(data.usage || data);
+
+    // 逐行打印动画
+    const lines = receiptText.split('\n');
+    paper.textContent = '';
+    let i = 0;
+    const printLine = () => {
+      if (i < lines.length) {
+        paper.textContent += (i === 0 ? '' : '\n') + lines[i];
+        i++;
+        // 滚动到底部
+        paper.scrollTop = paper.scrollHeight;
+        // 模拟打印机节奏：内容行快，分隔线稍慢
+        const line = lines[i - 1];
+        const delay = (line.includes('━') || line.includes('─')) ? 60 :
+                      line.trim() === '' ? 20 : 28;
+        setTimeout(printLine, delay);
+      } else {
+        modal.classList.remove('receipt-printing');
+        modal.classList.add('receipt-done');
+        // 打印完成后显示操作按钮
+        const actions = document.getElementById('receipt-actions');
+        if (actions) actions.style.display = 'flex';
+      }
+    };
+    // 打印机预热延迟
+    setTimeout(printLine, 400);
   } catch (e) {
+    modal.classList.remove('receipt-printing');
     paper.textContent = '打印失败：' + e.message;
+    const actions = document.getElementById('receipt-actions');
+    if (actions) actions.style.display = 'flex';
   }
 }
 
 function closeReceipt(e) {
   if (e.target === document.getElementById('receipt-overlay')) {
-    document.getElementById('receipt-overlay').classList.remove('open');
+    const overlay = document.getElementById('receipt-overlay');
+    overlay.classList.remove('open');
+    const actions = document.getElementById('receipt-actions');
+    if (actions) actions.style.display = 'none';
   }
 }
 
@@ -518,6 +573,7 @@ function copyReceipt() {
 // ── 统一刷新 ──────────────────────────────────────
 function loadAll() {
   loadBots();
+  fetch("/api/version").then(r=>r.json()).then(d=>{if(d.ok){const el=document.getElementById("sys-version");if(el)el.textContent="v"+d.version;}}).catch(()=>{});
   loadCronPreview();
   loadSignalPreview();
   loadTokenMini();

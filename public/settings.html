@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>设置 · 老巢</title>
 <link rel="icon" href="/avatars/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
   .quota-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem; }
@@ -32,6 +31,31 @@
   .plan-badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 4px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--accent); color: var(--bg-1); font-weight: 600; }
   .plan-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-2); margin-bottom: 1rem; }
   .period-label { font-size: 0.72rem; color: var(--text-3); font-family: var(--font-mono); }
+  .trend-chart { position: relative; margin-bottom: 1.4rem; }
+  .trend-chart-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 500; margin-bottom: 0.6rem; }
+  .trend-chart svg { display: block; width: 100%; height: 120px; overflow: visible; }
+  .trend-bar { cursor: pointer; transition: opacity 0.15s; }
+  .trend-bar:hover { opacity: 1 !important; }
+  .usage-summary { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .usage-stat { flex: 1; min-width: 130px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.7rem 0.9rem; }
+  .usage-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); margin-bottom: 0.25rem; }
+  .usage-stat-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .usage-stat-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 0.2rem; }
+  .trend-tooltip {
+    position: absolute;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.72rem;
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
 </style>
 </head>
 <body>
@@ -44,7 +68,7 @@
         <h1 class="topbar-title">老巢</h1>
         <span class="topbar-sub">话事厅 · Darknet Operations</span>
       </div>
-      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span><a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a></div>
     </header>
 
     <main class="page">
@@ -199,13 +223,60 @@ function renderQuotaCard(title, q) {
     </div>`;
 }
 
+function renderTrendChart(trend) {
+  const W = 600, H = 100, PAD = 4;
+  const max = Math.max(...trend.map(d => d.costUSD), 0.001);
+  const n = trend.length;
+  const barW = Math.max(2, Math.floor((W - PAD * (n + 1)) / n));
+  const gap = Math.floor((W - barW * n) / (n + 1));
+
+  const bars = trend.map((d, i) => {
+    const bh = Math.max(3, Math.round((d.costUSD / max) * H));
+    const x = gap + i * (barW + gap);
+    const y = H - bh;
+    return `<rect class="trend-bar" data-date="${d.date}" data-cost="${d.costUSD}"
+      x="${x}" y="${y}" width="${barW}" height="${bh}"
+      rx="2"
+      fill="var(--accent)" opacity="${0.45 + 0.55 * (d.costUSD / max)}"
+      onmouseenter="showTrendTip(event,this)" onmouseleave="hideTrendTip()"/>`;
+  }).join('');
+
+  return `<div class="trend-chart" id="trend-chart-wrap">
+    <div class="trend-chart-title">日花费趋势</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}</svg>
+    <div class="trend-tooltip" id="trend-tooltip"></div>
+  </div>`;
+}
+
+function showTrendTip(e, el) {
+  const wrap = document.getElementById('trend-chart-wrap');
+  const tip = document.getElementById('trend-tooltip');
+  if (!wrap || !tip) return;
+  const date = el.getAttribute('data-date');
+  const cost = parseFloat(el.getAttribute('data-cost'));
+  tip.textContent = `${date}  $${cost.toFixed(4)}`;
+  tip.style.display = 'block';
+  const rect = wrap.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  let left = er.left - rect.left + er.width / 2 - tip.offsetWidth / 2;
+  left = Math.max(0, Math.min(left, rect.width - tip.offsetWidth));
+  tip.style.left = left + 'px';
+  tip.style.top = (er.top - rect.top - tip.offsetHeight - 6) + 'px';
+}
+
+function hideTrendTip() {
+  const tip = document.getElementById('trend-tooltip');
+  if (tip) tip.style.display = 'none';
+}
+
 async function loadUsage(){
   const el=document.getElementById('usage-panel');
   el.innerHTML='<div class="loading">载入中…</div>';
   try{
-    const [subResp, usageResp] = await Promise.all([
+    const [subResp, usageResp, trendResp] = await Promise.all([
       fetch('/api/subscription').then(r=>r.json()),
       fetch('/api/usage').then(r=>r.json()),
+      fetch('/api/usage/trend').then(r=>r.json()).catch(()=>({ok:false})),
     ]);
 
     // handle legacy notConnected state
@@ -239,9 +310,44 @@ async function loadUsage(){
       </div>`;
     }
 
-    // ── 模型分布 ──
+    // ── 日花费趋势图 ──
+    if(trendResp.ok && Array.isArray(trendResp.trend) && trendResp.trend.length > 0){
+      html += renderTrendChart(trendResp.trend);
+    }
+
+    // ── 用量 summary（总计 + 最近计费日）──
     const u = usageResp.usage || {};
     const models = u.models || [];
+    const ld = u.latestDay || {};
+    const fmtNum = (n) => n != null ? n.toLocaleString() : '—';
+
+    html += '<div class="usage-summary">';
+    // 周期总花费
+    html += `<div class="usage-stat">
+      <div class="usage-stat-label">周期总花费</div>
+      <div class="usage-stat-value">${u.totalUSD ?? '—'}</div>
+      <div class="usage-stat-sub">${esc(u.statPeriod || '')}</div>
+    </div>`;
+    // 周期总 Token
+    if(u.totalTokens != null){
+      const tokM = (u.totalTokens / 1e6).toFixed(1);
+      html += `<div class="usage-stat">
+        <div class="usage-stat-label">周期总 Token</div>
+        <div class="usage-stat-value">${tokM}M</div>
+        <div class="usage-stat-sub">${fmtNum(u.totalTokens)} tokens</div>
+      </div>`;
+    }
+    // 最近计费日
+    if(ld.date){
+      html += `<div class="usage-stat">
+        <div class="usage-stat-label">最近计费日 <span title="${esc(ld.note||'')}" style="cursor:help">ⓘ</span></div>
+        <div class="usage-stat-value">${ld.costUSD != null ? ld.costUSD.toFixed(4) : '—'}</div>
+        <div class="usage-stat-sub">${esc(ld.date)}｜${ld.tokens != null ? fmtNum(ld.tokens)+' tokens' : ''}</div>
+      </div>`;
+    }
+    html += '</div>';
+
+    // ── 模型分布 ──
     const periodLabel = u.statPeriod ? ` <span class="period-label">${esc(u.statPeriod)}</span>` : '';
     html += `<div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-3);margin-bottom:0.4rem;font-weight:500">模型分布${periodLabel}</div>`;
 

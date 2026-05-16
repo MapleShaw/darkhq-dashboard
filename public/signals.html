@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>风声 · 老巢</title>
 <link rel="icon" href="/avatars/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,14 +19,14 @@
         <h1 class="topbar-title">老巢</h1>
         <span class="topbar-sub">话事厅 · Darknet Operations</span>
       </div>
-      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span><a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a></div>
     </header>
 
     <main class="page">
       <div class="page-header">
         <div>
           <h2 class="page-title">风声</h2>
-          <p class="page-desc">博客 / Twitter / 播客 三路风声汇总，可查旧账</p>
+          <p class="page-desc">博客 / Twitter / 即刻 三路风声汇总，可查旧账</p>
         </div>
         <button class="btn ghost sm" onclick="refresh()">↻ 更新</button>
       </div>
@@ -36,11 +35,11 @@
         <div class="stat"><div class="stat-label">当日</div><div class="stat-value" id="sig-total">—</div><div class="stat-sub">条风声</div></div>
         <div class="stat"><div class="stat-label">博客</div><div class="stat-value" id="sig-blog">—</div><div class="stat-sub">篇</div></div>
         <div class="stat"><div class="stat-label">𝕏 推文</div><div class="stat-value" id="sig-x">—</div><div class="stat-sub">条</div></div>
-        <div class="stat"><div class="stat-label">播客</div><div class="stat-value" id="sig-podcast">—</div><div class="stat-sub">集</div></div>
+        <div class="stat"><div class="stat-label">即刻</div><div class="stat-value" id="sig-jike">—</div><div class="stat-sub">条</div></div>
       </section>
 
       <div class="tabs">
-        <button class="tab active" data-tab="latest"  onclick="switchTab('latest',this)">今日风声</button>
+        <button class="tab active" data-tab="latest"  onclick="switchTab('latest',this)">最新风声 <span id="sig-updated-at" style="font-size:0.72em;opacity:.6;font-weight:400;margin-left:4px;"></span></button>
         <button class="tab"        data-tab="history" onclick="switchTab('history',this)">旧账 · 近 7 日</button>
       </div>
 
@@ -49,6 +48,7 @@
           <button class="filter-btn active" data-src="all"     onclick="applyFilter('all',this)">全部</button>
           <button class="filter-btn"        data-src="blog"    onclick="applyFilter('blog',this)">博客</button>
           <button class="filter-btn"        data-src="x"       onclick="applyFilter('x',this)">Twitter</button>
+          <button class="filter-btn"        data-src="jike"    onclick="applyFilter('jike',this)">即刻</button>
           <button class="filter-btn"        data-src="podcast" onclick="applyFilter('podcast',this)">播客</button>
         </div>
         <div class="signal-grid" id="signal-full"><div class="loading">探听中…</div></div>
@@ -95,10 +95,13 @@ async function loadLatest(){
   try{
     const data=await fetch('/api/signals').then(r=>r.json());
     allSignals=data.signals||[];
+    // generatedAt 在 data.generatedAt 里（server.js 从主源透传）
     document.getElementById('sig-total').textContent=allSignals.length;
     document.getElementById('sig-blog').textContent=allSignals.filter(s=>s.source==='blog').length;
     document.getElementById('sig-x').textContent=allSignals.filter(s=>s.source==='x').length;
-    document.getElementById('sig-podcast').textContent=allSignals.filter(s=>s.source==='podcast').length;
+    document.getElementById('sig-jike').textContent=allSignals.filter(s=>s.source==='jike').length;
+    const updEl=document.getElementById('sig-updated-at');
+    if(updEl&&data.generatedAt){const d=new Date(data.generatedAt);updEl.textContent='更新于 '+`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
     renderLatest();
   }catch(e){
     grid.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
