@@ -15,9 +15,14 @@ const router  = express.Router();
 const CUSTOM_SOURCES_PATH = path.join(
   require('os').homedir(), '.content-signal-radar', 'custom-sources.json'
 );
-const DEFAULT_SOURCES_PATH = path.join(
-  require('os').homedir(), 'content-signal-radar', 'config', 'default-sources.json'
-);
+const DEFAULT_SOURCES_CANDIDATES = [
+  path.join(require('os').homedir(), 'content-signal-radar', 'config', 'default-sources.json'),
+  path.join(require('os').homedir(), '.openclaw', 'workspace', 'content-signal-radar', 'config', 'default-sources.json')
+];
+
+function resolveDefaultSourcesPath() {
+  return DEFAULT_SOURCES_CANDIDATES.find(file => fs.existsSync(file)) || DEFAULT_SOURCES_CANDIDATES[0];
+}
 
 function safeReadJson(file, fallback = {}) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; }
@@ -32,7 +37,7 @@ function safeWriteJson(file, data) {
 }
 
 function getAllSources() {
-  const defaults = safeReadJson(DEFAULT_SOURCES_PATH, { profiles: {} });
+  const defaults = safeReadJson(resolveDefaultSourcesPath(), { profiles: {} });
   const custom = safeReadJson(CUSTOM_SOURCES_PATH, {});
 
   const result = {
