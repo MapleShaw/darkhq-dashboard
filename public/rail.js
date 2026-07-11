@@ -55,10 +55,13 @@
 
   // ── 移动端底部 tab bar ──────────────────────────────────
   const BOTTOM_TABS = [
-    { key: 'dashboard', href: '/',             label: '堂口', icon: '🏴' },
-    { key: 'cron',      href: '/cron.html',    label: '日程', icon: '📅' },
-    { key: 'signals',   href: '/signals.html', label: '风声', icon: '📡' },
-    { key: 'docs',      href: '/docs.html',    label: '卷宗', icon: '📂' },
+    { key: 'dashboard', href: '/',              label: '堂口', icon: '🏴' },
+    { key: 'cron',      href: '/cron.html',     label: '日程', icon: '📅' },
+    { key: 'signals',   href: '/signals.html',  label: '风声', icon: '📡' },
+    { key: 'docs',      href: '/docs.html',     label: '卷宗', icon: '📂' },
+    { key: 'wewe',      href: '/wewe.html',     label: '微读', icon: '📰' },
+    { key: 'headroom',  href: '/headroom.html', label: '省流', icon: '⚡' },
+    { key: 'status',    href: '/status.html',   label: '健康', icon: '🩺' },
     { key: 'settings',  href: '/settings.html', label: '设置', icon: '⚙️' },
   ];
 
