@@ -108,8 +108,9 @@ app.use('/api', (req, res, next) => {
   if (!DASHBOARD_TOKEN) return next();  // 未配置则放行（向后兼容）
   const authHeader = req.headers.authorization || '';
   const queryToken = req.query.token || '';
+  const cookies = parseCookies(req);
   const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : queryToken;
-  if (provided === DASHBOARD_TOKEN) return next();
+  if (provided === DASHBOARD_TOKEN || cookies.dh_session === DASHBOARD_TOKEN) return next();
   return res.status(401).json({ ok: false, error: 'Unauthorized' });
 });
 
@@ -118,6 +119,9 @@ app.use(require('./routes/bots'));
 app.use(require('./routes/cron'));
 app.use(require('./routes/signals'));
 app.use(require('./routes/sources'));
+app.use(require('./routes/wewe'));
+app.use(require('./routes/headroom'));
+app.use(require('./routes/status'));
 app.use(require('./routes/usage'));
 app.use(require('./routes/docs'));
 app.use(require('./routes/settings'));
