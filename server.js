@@ -101,7 +101,16 @@ app.get('/auth/logout', (req, res) => {
 });
 
 // ── 静态文件（auth 路由后面）──────────────────────────────────
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  // 控制台持续迭代，入口 HTML/JS/CSS 必须每次向服务端重新验证，
+  // 否则浏览器会在 24 小时内一直使用旧导航和旧样式。
+  maxAge: 0,
+  setHeaders(res, filePath) {
+    if (/\.(?:html|js|css)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 
 // ── API 鉴权中间件（仅当设置了 DASHBOARD_TOKEN 才启用）────
 app.use('/api', (req, res, next) => {

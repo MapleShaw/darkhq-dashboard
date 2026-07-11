@@ -144,8 +144,23 @@ function renderSources() {
       all.push({ ...item, _type: type, _layer: 'default' });
     }
   }
+  const sourceIdentity = (type, item) => {
+    const fields = {
+      x_accounts: ['handle', 'username', 'name'],
+      blogs: ['indexUrl', 'rsshub', 'url', 'name'],
+      podcasts: ['channelHandle', 'playlistId', 'url', 'name'],
+      jike_accounts: ['uuid', 'rsshub', 'name'],
+      bilibili_accounts: ['uid', 'rsshub', 'name']
+    }[type] || ['name'];
+    const value = fields.map(field => item[field]).find(Boolean) || JSON.stringify(item);
+    return type + ':' + String(value).trim().toLowerCase().replace(/^@/, '');
+  };
+  const seen = new Set(all.map(item => sourceIdentity(item._type, item)));
   for (const [type, items] of Object.entries(sourcesData.custom)) {
     for (const item of items) {
+      const identity = sourceIdentity(type, item);
+      if (seen.has(identity)) continue;
+      seen.add(identity);
       all.push({ ...item, _type: type, _layer: 'custom' });
     }
   }
