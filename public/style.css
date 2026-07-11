@@ -1321,3 +1321,27 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   .top-signal-item { grid-template-columns: 1.2rem 2rem minmax(0, 1fr); gap: .4rem; }
   .signal-search-wrap { width: 100%; }
 }
+
+/* ── 信息源卡片与操作 ───────────────────────────────────── */
+.source-card { padding: .7rem 1rem; }
+.source-card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; min-width: 0; }
+.source-card-body { min-width: 0; flex: 1 1 auto; }
+.source-card-name { overflow-wrap: anywhere; font-size: .85rem; font-weight: 600; }
+.source-card-meta { margin-top: .2rem; color: var(--text-3); font-size: .72rem; line-height: 1.5; }
+.source-card-key { margin-top: .15rem; overflow-wrap: anywhere; color: var(--text-3); font: .72rem var(--font-mono); }
+.source-delete-btn,
+.source-restore-btn { flex: 0 0 auto; min-width: 3rem; white-space: nowrap; word-break: keep-all; writing-mode: horizontal-tb; }
+.disabled-sources { grid-column: 1 / -1; margin-top: .5rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg-1); }
+.disabled-sources summary { cursor: pointer; color: var(--text-2); font-size: .78rem; }
+.disabled-source-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .6rem; margin-top: .8rem; }
+.disabled-source-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem .7rem; border-radius: var(--r-sm); background: var(--bg-2); }
+.disabled-source-row > div { min-width: 0; }
+.disabled-source-row strong { display: block; overflow-wrap: anywhere; font-size: .78rem; }
+.disabled-source-row span { display: block; margin-top: .15rem; color: var(--text-3); font-size: .68rem; }
+
+@media (max-width: 420px) {
+  .signal-grid { grid-template-columns: minmax(0, 1fr); }
+  .source-card { padding: .7rem .75rem; }
+  .source-card-row { gap: .5rem; }
+  .source-delete-btn { padding-inline: .55rem; }
+}

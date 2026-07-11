@@ -107,13 +107,13 @@
 <script src="rail.js"></script>
 <script>
 // ── Sources Tab ──────────────────────────────────────────
-let sourcesData = { default: {}, custom: {} };
+let sourcesData = { default: {}, custom: {}, disabled: {} };
 let sourceFilter = 'all';
 let sourceSearchQuery = '';
 
 async function loadSources() {
   try {
-    const res = await fetch('/api/sources');
+    const res = await fetch('/api/sources', { cache: 'no-store' });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
     sourcesData = json.data;
@@ -186,23 +186,23 @@ function renderSources() {
   const html = filtered.map(s => {
     const isCustom = s._layer === 'custom';
     const key = sourceItemLabel(s._type, s);
-    return '<div class="signal-card" style="padding:0.7rem 1rem;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">' +
-      '<div>' +
-      '<div style="font-weight:600;font-size:0.85rem;">' + esc(s.name) + '</div>' +
-      '<div style="font-size:0.72rem;color:var(--text-3);margin-top:0.2rem;">' +
+    return '<div class="signal-card source-card">' +
+      '<div class="source-card-row">' +
+      '<div class="source-card-body">' +
+      '<div class="source-card-name">' + esc(s.name) + '</div>' +
+      '<div class="source-card-meta">' +
       '<span class="source-tag ' + s._type + '">' + sourceTypeLabel(s._type) + '</span>' +
-      (s._profile ? ' · <span style="opacity:0.7">profile: ' + esc(s._profile) + '</span>' : '') +
-      ' · <span style="opacity:0.7">' + (isCustom ? '自定义' : '默认') + '</span>' +
+      (s._profile ? ' · <span>profile: ' + esc(s._profile) + '</span>' : '') +
+      ' · <span>' + (isCustom ? '自定义' : '默认') + '</span>' +
       '</div>' +
-      (key ? '<div style="font-size:0.72rem;color:var(--text-3);margin-top:0.15rem;font-family:monospace;">' + esc(key) + '</div>' : '') +
+      (key ? '<div class="source-card-key">' + esc(key) + '</div>' : '') +
       '</div>' +
-      (isCustom ? '<button class="btn ghost sm" onclick="removeSource(' + esc(JSON.stringify(s._type)) + ',' + esc(JSON.stringify(JSON.stringify(s))) + ')">删除</button>' : '') +
+      '<button type="button" class="btn ghost sm source-delete-btn" onclick="removeSource(' + esc(JSON.stringify(s._type)) + ',' + esc(JSON.stringify(JSON.stringify(s))) + ',' + esc(JSON.stringify(s._layer)) + ')">删除</button>' +
       '</div>' +
       '</div>';
   }).join('');
 
-  document.getElementById('sources-list').innerHTML = html;
+  document.getElementById('sources-list').innerHTML = html + renderDisabledSources();
 }
 
 function applySourceFilter(type, btn) {
@@ -255,22 +255,52 @@ async function addSource() {
   }
 }
 
-async function removeSource(type, itemJson) {
-  if (!confirm('确定删除这个自定义信息源？')) return;
+function renderDisabledSources() {
+  const disabled = [];
+  for (const [type, items] of Object.entries(sourcesData.disabled || {})) {
+    for (const item of items) disabled.push({ ...item, _type: type });
+  }
+  if (!disabled.length) return '';
+  return '<details class="disabled-sources">' +
+    '<summary>已禁用的默认来源（' + disabled.length + '）</summary>' +
+    '<div class="disabled-source-list">' + disabled.map(s =>
+      '<div class="disabled-source-row"><div><strong>' + esc(s.name || sourceItemLabel(s._type, s)) + '</strong>' +
+      '<span>' + sourceTypeLabel(s._type) + (s._profile ? ' · ' + esc(s._profile) : '') + '</span></div>' +
+      '<button type="button" class="btn ghost sm source-restore-btn" onclick="enableSource(' + esc(JSON.stringify(s._type)) + ',' + esc(JSON.stringify(JSON.stringify(s))) + ')">恢复</button></div>'
+    ).join('') + '</div></details>';
+}
+
+async function removeSource(type, itemJson, layer) {
   const item = JSON.parse(itemJson);
-  // remove internal fields before matching
-  delete item._type; delete item._layer; delete item._profile; delete item._isDefault;
+  const label = item.name || sourceItemLabel(type, item);
+  if (!confirm('确定' + (layer === 'default' ? '禁用默认来源' : '删除自定义来源') + '「' + label + '」？')) return;
   try {
     const res = await fetch('/api/sources/' + type, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item })
+      body: JSON.stringify({ item, layer })
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
     loadSources();
   } catch (e) {
     alert('删除失败: ' + e.message);
+  }
+}
+
+async function enableSource(type, itemJson) {
+  const item = JSON.parse(itemJson);
+  try {
+    const res = await fetch('/api/sources/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, item })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    loadSources();
+  } catch (e) {
+    alert('恢复失败: ' + e.message);
   }
 }
 </script>

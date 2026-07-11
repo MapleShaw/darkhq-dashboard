@@ -102,12 +102,15 @@ app.get('/auth/logout', (req, res) => {
 
 // ── 静态文件（auth 路由后面）──────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public'), {
-  // 控制台持续迭代，入口 HTML/JS/CSS 必须每次向服务端重新验证，
-  // 否则浏览器会在 24 小时内一直使用旧导航和旧样式。
+  // 控制台部署后应立即看到新页面；入口 HTML/JS/CSS 完全禁止浏览器持久缓存。
+  // 图片等静态媒体仍可使用 ETag 重新验证。
   maxAge: 0,
   setHeaders(res, filePath) {
     if (/\.(?:html|js|css)$/i.test(filePath)) {
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
     }
   }
 }));
