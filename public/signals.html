@@ -26,32 +26,75 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">风声</h2>
-          <p class="page-desc">博客 / Twitter / 即刻 三路风声汇总，可查旧账</p>
+          <p class="page-desc">公众号 / 博客 / Twitter / 即刻 四路风声汇总，可查旧账</p>
         </div>
-        <button class="btn ghost sm" onclick="refresh()">↻ 更新</button>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <a href="/wewe.html" class="btn ghost sm" style="text-decoration:none">📰 微读</a>
+          <button class="btn ghost sm" onclick="refresh()">↻ 更新</button>
+        </div>
       </div>
 
       <section class="stat-grid">
         <div class="stat"><div class="stat-label">当日</div><div class="stat-value" id="sig-total">—</div><div class="stat-sub">条风声</div></div>
+        <div class="stat"><div class="stat-label">公众号</div><div class="stat-value" id="sig-wechat">—</div><div class="stat-sub">篇</div></div>
         <div class="stat"><div class="stat-label">博客</div><div class="stat-value" id="sig-blog">—</div><div class="stat-sub">篇</div></div>
         <div class="stat"><div class="stat-label">𝕏 推文</div><div class="stat-value" id="sig-x">—</div><div class="stat-sub">条</div></div>
         <div class="stat"><div class="stat-label">即刻</div><div class="stat-value" id="sig-jike">—</div><div class="stat-sub">条</div></div>
       </section>
 
+      <div id="insight-panel"></div>
+
       <div class="tabs">
         <button class="tab active" data-tab="latest"  onclick="switchTab('latest',this)">最新风声 <span id="sig-updated-at" style="font-size:0.72em;opacity:.6;font-weight:400;margin-left:4px;"></span></button>
         <button class="tab"        data-tab="history" onclick="switchTab('history',this)">旧账 · 近 7 日</button>
+        <button class="tab"        data-tab="sources" onclick="switchTab('sources',this)">信息源</button>
       </div>
 
       <div id="tab-latest">
+        <div class="signal-search-wrap">
+          <input type="text" id="signal-search" class="signal-search-input" placeholder="🔍 搜标题、摘要、作者…" oninput="onSearchInput(this.value)" autocomplete="off">
+          <span id="signal-search-count" class="signal-search-count"></span>
+        </div>
         <div class="filters">
           <button class="filter-btn active" data-src="all"     onclick="applyFilter('all',this)">全部</button>
+          <button class="filter-btn"        data-src="wechat"  onclick="applyFilter('wechat',this)">公众号</button>
           <button class="filter-btn"        data-src="blog"    onclick="applyFilter('blog',this)">博客</button>
           <button class="filter-btn"        data-src="x"       onclick="applyFilter('x',this)">Twitter</button>
           <button class="filter-btn"        data-src="jike"    onclick="applyFilter('jike',this)">即刻</button>
           <button class="filter-btn"        data-src="podcast" onclick="applyFilter('podcast',this)">播客</button>
         </div>
         <div class="signal-grid" id="signal-full"><div class="loading">探听中…</div></div>
+      </div>
+
+      <div id="tab-sources" style="display:none">
+        <div class="signal-search-wrap">
+          <input type="text" id="source-search" class="signal-search-input" placeholder="🔍 搜名称、handle、URL…" oninput="onSourceSearch(this.value)" autocomplete="off">
+          <span id="source-search-count" class="signal-search-count"></span>
+        </div>
+        <div class="filters">
+          <button class="filter-btn active" data-src-type="all" onclick="applySourceFilter('all',this)">全部</button>
+          <button class="filter-btn" data-src-type="x_accounts" onclick="applySourceFilter('x_accounts',this)">𝕏 账号</button>
+          <button class="filter-btn" data-src-type="blogs" onclick="applySourceFilter('blogs',this)">博客 / RSS</button>
+          <button class="filter-btn" data-src-type="podcasts" onclick="applySourceFilter('podcasts',this)">播客</button>
+          <button class="filter-btn" data-src-type="jike_accounts" onclick="applySourceFilter('jike_accounts',this)">即刻</button>
+          <button class="filter-btn" data-src-type="bilibili_accounts" onclick="applySourceFilter('bilibili_accounts',this)">Bilibili</button>
+        </div>
+        <div id="sources-list" class="signal-grid"><div class="loading">整理中…</div></div>
+        <div style="margin-top:2rem;padding:1rem;border:1px dashed var(--border);border-radius:8px;">
+          <h3 style="font-size:0.85rem;margin-bottom:0.75rem;">➕ 添加自定义信息源（写入 custom-sources.json）</h3>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start;">
+            <select id="add-type" style="padding:0.4rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.78rem;">
+              <option value="x_accounts">𝕏 账号</option>
+              <option value="blogs">博客 / RSS</option>
+              <option value="jike_accounts">即刻</option>
+              <option value="bilibili_accounts">Bilibili</option>
+            </select>
+            <input type="text" id="add-name" placeholder="名称（如：赛博禅心）" style="padding:0.4rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.78rem;min-width:140px;">
+            <input type="text" id="add-key" placeholder="handle / URL / uid" style="padding:0.4rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.78rem;min-width:180px;">
+            <button class="btn sm" onclick="addSource()">添加</button>
+          </div>
+          <p style="font-size:0.7rem;color:var(--text-3);margin-top:0.5rem;">添加后通知我重新抓取即可生效。RSS 类型请填写 RSSHub 地址或 feed URL。</p>
+        </div>
       </div>
 
       <div id="tab-history" style="display:none">
@@ -61,7 +104,244 @@
   </div>
 </div>
 
-<script src="rail.js"></script>
+<script src="rail.js">
+
+// ── Sources Tab ──────────────────────────────────────────
+let sourcesData = { default: {}, custom: {} };
+let sourceFilter = 'all';
+let sourceSearchQuery = '';
+
+async function loadSources() {
+  try {
+    const res = await fetch('/api/sources');
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    sourcesData = json.data;
+    renderSources();
+  } catch (e) {
+    document.getElementById('sources-list').innerHTML = '<div class="empty"><span class="empty-icon">⚠</span>' + esc(e.message) + '</div>';
+  }
+}
+
+function sourceItemLabel(type, item) {
+  if (type === 'x_accounts') return '@' + (item.handle || item.name);
+  if (type === 'blogs') return item.indexUrl || item.rsshub || item.url || '';
+  if (type === 'podcasts') return item.channelHandle || item.playlistId || '';
+  if (type === 'jike_accounts') return item.uuid || '';
+  if (type === 'bilibili_accounts') return item.uid || '';
+  return '';
+}
+
+function sourceTypeLabel(type) {
+  const map = { x_accounts: '𝕏 账号', blogs: '博客', podcasts: '播客', jike_accounts: '即刻', bilibili_accounts: 'Bilibili' };
+  return map[type] || type;
+}
+
+function renderSources() {
+  const all = [];
+  for (const [type, items] of Object.entries(sourcesData.default)) {
+    for (const item of items) {
+      all.push({ ...item, _type: type, _layer: 'default' });
+    }
+  }
+  for (const [type, items] of Object.entries(sourcesData.custom)) {
+    for (const item of items) {
+      all.push({ ...item, _type: type, _layer: 'custom' });
+    }
+  }
+
+  let filtered = all;
+  if (sourceFilter !== 'all') filtered = filtered.filter(s => s._type === sourceFilter);
+  if (sourceSearchQuery) {
+    const q = sourceSearchQuery.toLowerCase();
+    filtered = filtered.filter(s =>
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.handle || '').toLowerCase().includes(q) ||
+      (s.indexUrl || s.rsshub || s.url || '').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('source-search-count').textContent = filtered.length + ' 条';
+
+  if (!filtered.length) {
+    document.getElementById('sources-list').innerHTML = '<div class="empty"><span class="empty-icon">📭</span>暂无匹配信息源</div>';
+    return;
+  }
+
+  const html = filtered.map(s => {
+    const isCustom = s._layer === 'custom';
+    const key = sourceItemLabel(s._type, s);
+    return '<div class="signal-card" style="padding:0.7rem 1rem;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">' +
+      '<div>' +
+      '<div style="font-weight:600;font-size:0.85rem;">' + esc(s.name) + '</div>' +
+      '<div style="font-size:0.72rem;color:var(--text-3);margin-top:0.2rem;">' +
+      '<span class="source-tag ' + s._type + '">' + sourceTypeLabel(s._type) + '</span>' +
+      (s._profile ? ' · <span style="opacity:0.7">profile: ' + esc(s._profile) + '</span>' : '') +
+      ' · <span style="opacity:0.7">' + (isCustom ? '自定义' : '默认') + '</span>' +
+      '</div>' +
+      (key ? '<div style="font-size:0.72rem;color:var(--text-3);margin-top:0.15rem;font-family:monospace;">' + esc(key) + '</div>' : '') +
+      '</div>' +
+      (isCustom ? '<button class="btn ghost sm" onclick="removeSource(' + esc(JSON.stringify(s._type)) + ',' + esc(JSON.stringify(JSON.stringify(s))) + ')">删除</button>' : '') +
+      '</div>' +
+      '</div>';
+  }).join('');
+
+  document.getElementById('sources-list').innerHTML = html;
+}
+
+function applySourceFilter(type, btn) {
+  sourceFilter = type;
+  document.querySelectorAll('[data-src-type]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSources();
+}
+
+function onSourceSearch(val) {
+  sourceSearchQuery = val.trim();
+  renderSources();
+}
+
+async function addSource() {
+  const type = document.getElementById('add-type').value;
+  const name = document.getElementById('add-name').value.trim();
+  const key = document.getElementById('add-key').value.trim();
+  if (!name || !key) return alert('名称和 handle/URL 不能为空');
+
+  const item = { name };
+  if (type === 'x_accounts') item.handle = key;
+  else if (type === 'blogs') {
+    if (key.startsWith('http')) {
+      item.type = 'rss';
+      item.indexUrl = key;
+      item.fetchMethod = 'http';
+    } else {
+      item.rsshub = key;
+      item.type = 'rss';
+    }
+  }
+  else if (type === 'jike_accounts') { item.uuid = key; item.rsshub = 'https://rsshub.ktachibana.party/jike/user/' + key; }
+  else if (type === 'bilibili_accounts') { item.uid = key; item.rsshub = 'https://rsshub.ktachibana.party/bilibili/user/dynamic/' + key; }
+
+  try {
+    const res = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, item })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    alert('✅ 已添加: ' + name + '\n通知我重新抓取即可生效');
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-key').value = '';
+    loadSources();
+  } catch (e) {
+    alert('添加失败: ' + e.message);
+  }
+}
+
+async function removeSource(type, itemJson) {
+  if (!confirm('确定删除这个自定义信息源？')) return;
+  const item = JSON.parse(itemJson);
+  // remove internal fields before matching
+  delete item._type; delete item._layer; delete item._profile; delete item._isDefault;
+  try {
+    const res = await fetch('/api/sources/' + type, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    loadSources();
+  } catch (e) {
+    alert('删除失败: ' + e.message);
+  }
+}
+</script>
+<script>
+function extractTopic(reason) {
+  if (!reason) return null;
+  const m = String(reason).match(/\[([^\]]+)\]/);
+  return m ? m[1] : null;
+}
+
+// reason 字段可读翻译
+const REASON_MAP = {
+  '[product_signal]': '🚀 产品信号',
+  '[x_angle]':        '🐦 X 视角',
+  '[both]':           '✅ 双重匹配',
+  '[neither]':        '⚪ 弱相关',
+  'SHORT_TEXT':       '📝 内容过短',
+  'HIGH_SOURCE_LOW_ENG': '⚠️ 来源权重高但互动低',
+};
+function fmtReason(r) {
+  if (!r) return null;
+  return REASON_MAP[r] || r;
+}
+
+function scoreClass(s) {
+  return s >= 90 ? 'hi' : s >= 70 ? 'mid' : 'lo';
+}
+
+const SOURCE_EMOJI = { x: '🐦', blog: '📝', wechat: '💬', jike: '🟠', podcast: '🎙' };
+
+function renderInsightPanel(signals) {
+  const panel = document.getElementById('insight-panel');
+  if (!panel || !signals.length) return;
+
+  const top10 = [...signals].sort((a,b) => b.score - a.score).slice(0,10);
+
+  const srcMap = {};
+  signals.forEach(s => { srcMap[s.source] = (srcMap[s.source]||0) + 1; });
+  const srcEntries = Object.entries(srcMap).sort((a,b) => b[1]-a[1]);
+
+  const topicMap = {};
+  signals.forEach(s => {
+    const t = extractTopic(s.reason);
+    if (t) topicMap[t] = (topicMap[t]||0) + 1;
+  });
+  const topicEntries = Object.entries(topicMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const maxTopic = topicEntries[0]?.[1] || 1;
+  const maxSrc = srcEntries[0]?.[1] || 1;
+
+  const fmtTag = t => t.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  panel.innerHTML = `<div class="insight-panel">
+    <div class="insight-block">
+      <div class="insight-block-title">🏆 高分风声 Top 10</div>
+      ${top10.map((s,i) => `
+        <div class="top-signal-item">
+          <span class="top-signal-rank">${i+1}</span>
+          <span class="top-signal-score ${scoreClass(s.score)}">${s.score}</span>
+          <div class="top-signal-body">
+            <a class="top-signal-title" href="${esc(s.url||'#')}" target="_blank" rel="noopener">
+              ${SOURCE_EMOJI[s.source]||'●'} ${esc((s.title||'').slice(0,40))}
+            </a>
+            <div class="top-signal-meta">${esc(s.sourceName||s.source||'')}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="insight-block">
+      <div class="insight-block-title">📊 来源分布</div>
+      ${srcEntries.map(([src,cnt]) => `
+        <div class="dist-row">
+          <span class="dist-label">${SOURCE_EMOJI[src]||'●'} ${esc(src)}</span>
+          <div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.round(cnt/maxSrc*100)}%"></div></div>
+          <span class="dist-count">${cnt}</span>
+        </div>`).join('')}
+      ${topicEntries.length ? `
+        <div class="insight-block-title" style="margin-top:0.9rem">🏷 话题分布</div>
+        ${topicEntries.map(([tag,cnt]) => `
+          <div class="dist-row">
+            <span class="dist-label">${esc(fmtTag(tag))}</span>
+            <div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.round(cnt/maxTopic*100)}%;background:var(--accent-2)"></div></div>
+            <span class="dist-count">${cnt}</span>
+          </div>`).join('')}` : ''}
+    </div>
+  </div>`;
+}
+</script>
 <script>
 function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
 setInterval(updateClock,1000);updateClock();
@@ -80,13 +360,14 @@ function signalCard(sig){
       ${sig.url?`<a href="${esc(sig.url)}" target="_blank" rel="noopener">${esc(sig.title)}</a>`:esc(sig.title)}
     </h3>
     ${sig.summary?`<p class="signal-summary">${esc(sig.summary)}</p>`:''}
-    ${sig.reason?`<div class="signal-reason">${esc(sig.reason)}</div>`:''}
+    ${sig.reason?`<div class="signal-reason">${esc(fmtReason(sig.reason))}</div>`:''}
     <div class="signal-meta"><span>${fmtTime(sig.publishedAt)}</span></div>
   </article>`;
 }
 
 let allSignals=[];
 let currentFilter='all';
+let currentSearch='';
 let currentTab='latest';
 
 async function loadLatest(){
@@ -97,21 +378,40 @@ async function loadLatest(){
     allSignals=data.signals||[];
     // generatedAt 在 data.generatedAt 里（server.js 从主源透传）
     document.getElementById('sig-total').textContent=allSignals.length;
+    document.getElementById('sig-wechat').textContent=allSignals.filter(s=>s.source==='wechat').length;
     document.getElementById('sig-blog').textContent=allSignals.filter(s=>s.source==='blog').length;
     document.getElementById('sig-x').textContent=allSignals.filter(s=>s.source==='x').length;
     document.getElementById('sig-jike').textContent=allSignals.filter(s=>s.source==='jike').length;
     const updEl=document.getElementById('sig-updated-at');
     if(updEl&&data.generatedAt){const d=new Date(data.generatedAt);updEl.textContent='更新于 '+`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+    renderInsightPanel(allSignals);
     renderLatest();
   }catch(e){
     grid.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
+function matchSearch(sig, q) {
+  if (!q) return true;
+  const lower = q.toLowerCase();
+  return (sig.title||''). toLowerCase().includes(lower) ||
+         (sig.summary||'').toLowerCase().includes(lower) ||
+         (sig.sourceName||'').toLowerCase().includes(lower) ||
+         (sig.reason||'').toLowerCase().includes(lower);
+}
+
 function renderLatest(){
   const grid=document.getElementById('signal-full');
-  const list=currentFilter==='all'?allSignals:allSignals.filter(s=>s.source===currentFilter);
-  if(!list.length){grid.innerHTML='<div class="empty"><span class="empty-icon">📡</span>未探到风声</div>';return;}
+  let list=currentFilter==='all'?allSignals:allSignals.filter(s=>s.source===currentFilter);
+  if(currentSearch) list=list.filter(s=>matchSearch(s,currentSearch));
+  const countEl=document.getElementById('signal-search-count');
+  if(countEl) countEl.textContent=currentSearch?`${list.length} 条结果`:'';
+  if(!list.length){
+    grid.innerHTML=currentSearch
+      ?'<div class="empty"><span class="empty-icon">🔍</span>没找到匹配的风声</div>'
+      :'<div class="empty"><span class="empty-icon">📡</span>未探到风声</div>';
+    return;
+  }
   grid.innerHTML=list.map(signalCard).join('');
 }
 
@@ -119,6 +419,12 @@ function applyFilter(src,btn){
   currentFilter=src;
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  renderLatest();
+  // 切渠道时 insight panel 保持全局数据（已在 tabs 上方，语义为全局日报摘要）
+}
+
+function onSearchInput(val){
+  currentSearch=val.trim();
   renderLatest();
 }
 
@@ -150,14 +456,25 @@ function switchTab(tab,btn){
   btn.classList.add('active');
   document.getElementById('tab-latest').style.display  = tab==='latest' ? '' : 'none';
   document.getElementById('tab-history').style.display = tab==='history' ? '' : 'none';
+  document.getElementById('tab-sources').style.display = tab==='sources' ? '' : 'none';
   if(tab==='history' && !document.getElementById('history-timeline').dataset.loaded){
     loadHistory().then(()=>{document.getElementById('history-timeline').dataset.loaded='1';});
+  }
+  if(tab==='sources' && !document.getElementById('sources-list').dataset.loaded){
+    loadSources().then(()=>{document.getElementById('sources-list').dataset.loaded='1';});
   }
 }
 
 function refresh(){
   if(currentTab==='latest') loadLatest();
-  else { document.getElementById('history-timeline').dataset.loaded=''; loadHistory().then(()=>{document.getElementById('history-timeline').dataset.loaded='1';}); }
+  else if(currentTab==='history'){
+    document.getElementById('history-timeline').dataset.loaded='';
+    loadHistory().then(()=>{document.getElementById('history-timeline').dataset.loaded='1';});
+  }
+  else if(currentTab==='sources'){
+    document.getElementById('sources-list').dataset.loaded='';
+    loadSources().then(()=>{document.getElementById('sources-list').dataset.loaded='1';});
+  }
 }
 
 document.addEventListener('DOMContentLoaded',loadLatest);

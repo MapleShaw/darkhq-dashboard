@@ -117,6 +117,7 @@ app.use('/api', (req, res, next) => {
 app.use(require('./routes/bots'));
 app.use(require('./routes/cron'));
 app.use(require('./routes/signals'));
+app.use(require('./routes/sources'));
 app.use(require('./routes/usage'));
 app.use(require('./routes/docs'));
 app.use(require('./routes/settings'));
