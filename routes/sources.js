@@ -57,9 +57,23 @@ function cleanItem(item, { keepProfile = false } = {}) {
   return cleaned;
 }
 
+function normalizeIdentityValue(type, field, raw) {
+  let value = String(raw).trim().toLowerCase();
+  if (type === 'x_accounts' || field === 'channelHandle') value = value.replace(/^@/, '');
+  if (['indexUrl', 'rsshub', 'url'].includes(field)) {
+    try {
+      const url = new URL(value);
+      url.hostname = url.hostname.toLowerCase();
+      if (url.pathname !== '/') url.pathname = url.pathname.replace(/\/+$/, '');
+      value = url.toString().replace(/\/$/, '');
+    } catch (e) { value = value.replace(/\/+$/, ''); }
+  }
+  return value;
+}
+
 function sourceIdentity(type, item) {
   const field = (IDENTITY_FIELDS[type] || ['name']).find(key => item && item[key] != null && String(item[key]).trim());
-  const value = field ? String(item[field]).trim().toLowerCase().replace(type === 'x_accounts' ? /^@/ : /$^/, '') : JSON.stringify(cleanItem(item));
+  const value = field ? normalizeIdentityValue(type, field, item[field]) : JSON.stringify(cleanItem(item));
   const profile = item && item._profile ? String(item._profile).trim().toLowerCase() : '';
   return `${type}:${profile}:${field || 'json'}:${value}`;
 }
@@ -70,10 +84,16 @@ function normalizeDisabled(raw) {
   return result;
 }
 
+function readDisabledDefaults() {
+  if (!fs.existsSync(DISABLED_DEFAULTS_PATH)) return normalizeDisabled({});
+  // 禁用状态不能静默回退，否则 JSON 损坏会让所有已禁用来源重新出现。
+  return normalizeDisabled(JSON.parse(fs.readFileSync(DISABLED_DEFAULTS_PATH, 'utf8')));
+}
+
 function getAllSources() {
   const defaults = safeReadJson(resolveDefaultSourcesPath(), { profiles: {} });
   const custom = safeReadJson(CUSTOM_SOURCES_PATH, {});
-  const disabled = normalizeDisabled(safeReadJson(DISABLED_DEFAULTS_PATH, {}));
+  const disabled = readDisabledDefaults();
   const disabledIds = new Set();
   for (const type of VALID_TYPES) {
     for (const item of disabled[type]) disabledIds.add(sourceIdentity(type, item));
@@ -94,8 +114,9 @@ function getAllSources() {
   for (const [profileName, profile] of Object.entries(defaults.profiles || {})) {
     for (const type of VALID_TYPES) {
       for (const source of profile[type] || []) {
-        const item = { ...source, _profile: profileName, _isDefault: true };
-        if (!disabledIds.has(sourceIdentity(type, item))) result.default[type].push(item);
+        const item = { ...source, _profile: profileName, _layer: 'default', _isDefault: true };
+        item._id = sourceIdentity(type, item);
+        if (!disabledIds.has(item._id)) result.default[type].push(item);
       }
     }
   }
@@ -104,7 +125,8 @@ function getAllSources() {
 
 router.get('/api/sources', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ ok: true, data: getAllSources() });
+  try { res.json({ ok: true, data: getAllSources() }); }
+  catch (e) { res.status(500).json({ ok: false, error: `Failed to read source state: ${e.message}` }); }
 });
 
 router.post('/api/sources', (req, res) => {
@@ -125,6 +147,25 @@ router.post('/api/sources', (req, res) => {
   res.json({ ok: true, data: clean });
 });
 
+router.post('/api/sources/default/disable', (req, res) => {
+  const { type, item } = req.body || {};
+  if (!VALID_TYPES.includes(type)) return res.status(400).json({ ok: false, error: `Invalid type: ${type}` });
+  if (!item || typeof item !== 'object' || Array.isArray(item) || !item._profile) {
+    return res.status(400).json({ ok: false, error: 'default item with _profile is required' });
+  }
+  try {
+    const active = getAllSources().default[type];
+    const identity = sourceIdentity(type, item);
+    if (!active.some(existing => existing._id === identity)) {
+      return res.status(404).json({ ok: false, error: 'Default item not found or already disabled' });
+    }
+    const disabled = readDisabledDefaults();
+    disabled[type].push(cleanItem(item, { keepProfile: true }));
+    if (!safeWriteJson(DISABLED_DEFAULTS_PATH, disabled)) return res.status(500).json({ ok: false, error: 'Failed to write disabled defaults' });
+    res.json({ ok: true, disabled: 1, id: identity });
+  } catch (e) { res.status(500).json({ ok: false, error: `Failed to update source state: ${e.message}` }); }
+});
+
 router.delete('/api/sources/:type', (req, res) => {
   const { type } = req.params;
   const { item, layer = 'custom' } = req.body || {};
@@ -138,7 +179,7 @@ router.delete('/api/sources/:type', (req, res) => {
     if (!defaults.some(existing => sourceIdentity(type, existing) === identity)) {
       return res.status(404).json({ ok: false, error: 'Default item not found or already disabled' });
     }
-    const disabled = normalizeDisabled(safeReadJson(DISABLED_DEFAULTS_PATH, {}));
+    const disabled = readDisabledDefaults();
     const record = cleanItem(item, { keepProfile: true });
     if (!disabled[type].some(existing => sourceIdentity(type, existing) === identity)) disabled[type].push(record);
     if (!safeWriteJson(DISABLED_DEFAULTS_PATH, disabled)) return res.status(500).json({ ok: false, error: 'Failed to write disabled defaults' });
@@ -161,7 +202,7 @@ router.post('/api/sources/enable', (req, res) => {
   if (!VALID_TYPES.includes(type)) return res.status(400).json({ ok: false, error: `Invalid type: ${type}` });
   if (!item || typeof item !== 'object' || Array.isArray(item)) return res.status(400).json({ ok: false, error: 'item is required' });
 
-  const disabled = normalizeDisabled(safeReadJson(DISABLED_DEFAULTS_PATH, {}));
+  const disabled = readDisabledDefaults();
   const identity = sourceIdentity(type, item);
   const beforeLen = disabled[type].length;
   disabled[type] = disabled[type].filter(existing => sourceIdentity(type, existing) !== identity);

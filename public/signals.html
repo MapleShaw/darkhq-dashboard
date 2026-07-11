@@ -275,10 +275,11 @@ async function removeSource(type, itemJson, layer) {
   const label = item.name || sourceItemLabel(type, item);
   if (!confirm('确定' + (layer === 'default' ? '禁用默认来源' : '删除自定义来源') + '「' + label + '」？')) return;
   try {
-    const res = await fetch('/api/sources/' + type, {
-      method: 'DELETE',
+    const endpoint = layer === 'default' ? '/api/sources/default/disable' : '/api/sources/' + type;
+    const res = await fetch(endpoint, {
+      method: layer === 'default' ? 'POST' : 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item, layer })
+      body: JSON.stringify(layer === 'default' ? { type, item } : { item, layer })
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
