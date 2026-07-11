@@ -5,10 +5,58 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>设置 · 老巢</title>
 <link rel="icon" href="/avatars/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+  .quota-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem; }
+  @media (max-width: 500px) { .quota-cards { grid-template-columns: 1fr; } }
+  .quota-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+  }
+  .quota-card-title { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.8rem; }
+  .quota-card-big { font-size: 2rem; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-bottom: 0.3rem; }
+  .quota-card-big span { font-size: 1rem; font-weight: 400; color: var(--text-3); margin-left: 0.3rem; }
+  .quota-card-bar-track { height: 6px; border-radius: 999px; background: var(--bg-3); overflow: hidden; margin: 0.7rem 0 0.5rem; }
+  .quota-card-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+  .quota-card-meta { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-3); font-family: var(--font-mono); }
+  .model-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  .model-table th { font-size: 0.7rem; color: var(--text-3); text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .model-table td { font-size: 0.78rem; padding: 0.55rem 0.6rem; border-bottom: 0.5px solid var(--line); color: var(--text-2); vertical-align: middle; }
+  .model-table td.mono { font-family: var(--font-mono); color: var(--text-1); }
+  .model-bar { height: 5px; border-radius: 999px; background: var(--accent); opacity: 0.8; }
+  .plan-badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 4px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--accent); color: var(--bg-1); font-weight: 600; }
+  .plan-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-2); margin-bottom: 1rem; }
+  .period-label { font-size: 0.72rem; color: var(--text-3); font-family: var(--font-mono); }
+  .trend-chart { position: relative; margin-bottom: 1.4rem; }
+  .trend-chart-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 500; margin-bottom: 0.6rem; }
+  .trend-chart svg { display: block; width: 100%; height: 120px; overflow: visible; }
+  .trend-bar { cursor: pointer; transition: opacity 0.15s; }
+  .trend-bar:hover { opacity: 1 !important; }
+  .usage-summary { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .usage-stat { flex: 1; min-width: 130px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.7rem 0.9rem; }
+  .usage-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); margin-bottom: 0.25rem; }
+  .usage-stat-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .usage-stat-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 0.2rem; }
+  .trend-tooltip {
+    position: absolute;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.72rem;
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+</style>
 </head>
 <body>
 <div class="app">
@@ -20,7 +68,7 @@
         <h1 class="topbar-title">老巢</h1>
         <span class="topbar-sub">话事厅 · Darknet Operations</span>
       </div>
-      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span><a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a></div>
     </header>
 
     <main class="page">
@@ -39,7 +87,7 @@
               班底身份
               <button class="btn primary sm" onclick="saveAllBots()">保存</button>
             </div>
-            <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:1rem">
+            <div id="bot-settings-list" style="display:flex;flex-direction:column;gap:0.5rem">
               <div class="loading">载入中…</div>
             </div>
             <div id="bot-save-msg" style="margin-top:0.8rem;font-size:0.8rem;text-align:right;min-height:1.2rem"></div>
@@ -104,24 +152,13 @@ async function loadBots(){
       const role=s.role||bot.role;
       const avatar=bot.avatarUrl||`/avatars/bot-${bot.id}.png`;
       return `
-      <div style="display:flex;gap:1rem;align-items:flex-start;padding:0.9rem;background:var(--bg-2);border-radius:var(--r-md)">
-        <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--bg-3);flex-shrink:0;border:1px solid var(--line)">
+      <div style="display:flex;gap:0.7rem;align-items:center;padding:0.55rem 0.8rem;background:var(--bg-2);border-radius:var(--r-md)">
+        <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--bg-3);flex-shrink:0;border:1px solid var(--line)">
           <img src="${esc(avatar)}" alt="${esc(bot.name)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:0.6rem;min-width:0">
-          <div>
-            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">显示名称</label>
-            <input type="text" class="input bot-name-input" data-id="${esc(bot.id)}" value="${esc(name)}">
-          </div>
-          <div>
-            <label style="display:block;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem">角色描述</label>
-            <input type="text" class="input bot-role-input" data-id="${esc(bot.id)}" value="${esc(role)}">
-          </div>
-          <div style="display:flex;gap:1rem;font-size:0.72rem;color:var(--text-3);font-family:var(--font-mono)">
-            <span>ID: ${esc(bot.id)}</span>
-            <span>模型: ${esc(bot.model)}</span>
-          </div>
-        </div>
+        <input type="text" class="input bot-name-input" data-id="${esc(bot.id)}" value="${esc(name)}" placeholder="名称" style="width:5.5rem;flex-shrink:0">
+        <input type="text" class="input bot-role-input" data-id="${esc(bot.id)}" value="${esc(role)}" placeholder="角色" style="flex:1;min-width:0">
+        <span style="font-size:0.68rem;color:var(--text-3);font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">${esc(bot.model)}</span>
       </div>`;
     }).join('');
 
@@ -153,43 +190,186 @@ async function saveAllBots(){
   setTimeout(()=>{msg.innerHTML='';},3000);
 }
 
-function fmtNum(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return String(n);}
+/* ── Usage helpers ── */
+const fmtNum = (n) => Number(n).toLocaleString('zh-CN');
+const fmtFlows = (v) => v != null ? (v >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v).toString()) : '—';
+const fmtUSD = (v) => v != null ? '$' + Number(v).toFixed(2) : '—';
+
+const fmtResetFull = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const sh = new Date(d.getTime() + 8 * 3600 * 1000);
+  return sh.toISOString().slice(0,16).replace('T',' ') + ' (CST)';
+};
+
+const barColor = (pct) => pct >= 90 ? '#ff4d4d' : pct >= 70 ? '#e08a00' : 'var(--accent)';
+
+function renderQuotaCard(title, q) {
+  const pct = Math.min(100, Math.round((q.usage_percentage || 0) * 100));
+  return `
+    <div class="quota-card">
+      <div class="quota-card-title">${esc(title)}</div>
+      <div class="quota-card-big">${fmtFlows(q.used_flows)}<span>/ ${fmtFlows(q.max_flows)} flows</span></div>
+      <div class="quota-card-bar-track">
+        <div class="quota-card-bar-fill" style="width:${pct}%;background:${barColor(pct)}"></div>
+      </div>
+      <div class="quota-card-meta">
+        <span>剩余 ${fmtFlows(q.remaining_flows)} flows</span>
+        <span>${pct}%</span>
+      </div>
+      <div style="margin-top:0.6rem;font-size:0.7rem;color:var(--text-3);font-family:var(--font-mono)">
+        ${fmtUSD(q.used_value_usd)} / ${fmtUSD(q.max_value_usd)} · 重置于 ${fmtResetFull(q.resets_at)}
+      </div>
+    </div>`;
+}
+
+function renderTrendChart(trend) {
+  const W = 600, H = 100, PAD = 4;
+  const max = Math.max(...trend.map(d => d.costUSD), 0.001);
+  const n = trend.length;
+  const barW = Math.max(2, Math.floor((W - PAD * (n + 1)) / n));
+  const gap = Math.floor((W - barW * n) / (n + 1));
+
+  const bars = trend.map((d, i) => {
+    const bh = Math.max(3, Math.round((d.costUSD / max) * H));
+    const x = gap + i * (barW + gap);
+    const y = H - bh;
+    return `<rect class="trend-bar" data-date="${d.date}" data-cost="${d.costUSD}"
+      x="${x}" y="${y}" width="${barW}" height="${bh}"
+      rx="2"
+      fill="var(--accent)" opacity="${0.45 + 0.55 * (d.costUSD / max)}"
+      onmouseenter="showTrendTip(event,this)" onmouseleave="hideTrendTip()"/>`;
+  }).join('');
+
+  return `<div class="trend-chart" id="trend-chart-wrap">
+    <div class="trend-chart-title">日花费趋势</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}</svg>
+    <div class="trend-tooltip" id="trend-tooltip"></div>
+  </div>`;
+}
+
+function showTrendTip(e, el) {
+  const wrap = document.getElementById('trend-chart-wrap');
+  const tip = document.getElementById('trend-tooltip');
+  if (!wrap || !tip) return;
+  const date = el.getAttribute('data-date');
+  const cost = parseFloat(el.getAttribute('data-cost'));
+  tip.textContent = `${date}  $${cost.toFixed(4)}`;
+  tip.style.display = 'block';
+  const rect = wrap.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  let left = er.left - rect.left + er.width / 2 - tip.offsetWidth / 2;
+  left = Math.max(0, Math.min(left, rect.width - tip.offsetWidth));
+  tip.style.left = left + 'px';
+  tip.style.top = (er.top - rect.top - tip.offsetHeight - 6) + 'px';
+}
+
+function hideTrendTip() {
+  const tip = document.getElementById('trend-tooltip');
+  if (tip) tip.style.display = 'none';
+}
 
 async function loadUsage(){
   const el=document.getElementById('usage-panel');
   el.innerHTML='<div class="loading">载入中…</div>';
   try{
-    const data=await fetch('/api/usage').then(r=>r.json());
-    if(data.notConnected){
+    const [subResp, usageResp, trendResp] = await Promise.all([
+      fetch('/api/subscription').then(r=>r.json()),
+      fetch('/api/usage').then(r=>r.json()),
+      fetch('/api/usage/trend').then(r=>r.json()).catch(()=>({ok:false})),
+    ]);
+
+    // handle legacy notConnected state
+    if(usageResp.notConnected){
       el.innerHTML=`
         <div style="padding:1rem 1.2rem;background:rgba(242,185,75,0.08);border-left:3px solid var(--warn);border-radius:0 var(--r-sm) var(--r-sm) 0">
           <div style="color:var(--warn);font-weight:600;margin-bottom:0.4rem">⚠ Gateway 未对接 Token 用量接口</div>
-          <div style="font-size:0.85rem;color:var(--text-2);line-height:1.6">${esc(data.reason||'Gateway 未暴露 /api/usage')}</div>
-          <div style="font-size:0.8rem;color:var(--text-3);margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--line)">
-            对接指引见 <a href="https://github.com" style="color:var(--accent-2)">PROJECT.md §7.6</a>（需要 OpenClaw gateway 实现 <code>GET /api/usage</code>，返回含 <code>totalTokens / todayTokens / models[] / bots[]</code> 的结构）
-          </div>
+          <div style="font-size:0.85rem;color:var(--text-2);line-height:1.6">${esc(usageResp.reason||'Gateway 未暴露 /api/usage')}</div>
         </div>`;
       return;
     }
-    const u=data.usage||{};
-    const models=u.models||[];
-    el.innerHTML=`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem">
-        <div><div class="stat-label">总用量</div><div class="stat-value" style="font-size:1.8rem">${fmtNum(u.totalTokens||0)}</div></div>
-        <div><div class="stat-label">今日</div><div class="stat-value" style="font-size:1.8rem;color:var(--accent-2)">${fmtNum(u.todayTokens||0)}</div></div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:0.8rem">
-        ${models.map(m=>`
-          <div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem">
-              <span>${esc(m.model)}</span>
-              <span style="color:var(--text-3);font-family:var(--font-mono)">${fmtNum(m.tokens)} · ${m.pct}%</span>
-            </div>
-            <div class="progress"><div class="progress-fill" style="width:${m.pct}%"></div></div>
-          </div>`).join('')}
+
+    let html='';
+
+    // ── 计划信息 badge ──
+    const d = subResp.ok ? subResp.data : null;
+    const plan = d?.plan || {};
+    if(d){
+      html += `<div class="plan-row">
+        <span class="plan-badge">${esc(plan.tier || 'unknown')}</span>
+        <span>到期：${plan.expires_at ? esc(new Date(new Date(plan.expires_at).getTime()+8*3600000).toISOString().slice(0,10)) : '—'}</span>
+        <span>$${plan.amount_usd ?? '—'}/mo</span>
       </div>`;
+    }
+
+    // ── 配额窗口 ──
+    if(d){
+      html += `<div class="quota-cards">
+        ${renderQuotaCard('5小时窗口', d.quota_5_hour || {})}
+        ${renderQuotaCard('7天窗口', d.quota_7_day || {})}
+      </div>`;
+    }
+
+    // ── 日花费趋势图 ──
+    if(trendResp.ok && Array.isArray(trendResp.trend) && trendResp.trend.length > 0){
+      html += renderTrendChart(trendResp.trend);
+    }
+
+    // ── 用量 summary（总计 + 最近计费日）──
+    const u = usageResp.usage || {};
+    const models = u.models || [];
+    const ld = u.latestDay || {};
+    const fmtNum = (n) => n != null ? n.toLocaleString() : '—';
+
+    html += '<div class="usage-summary">';
+    // 周期总花费
+    html += `<div class="usage-stat">
+      <div class="usage-stat-label">周期总花费</div>
+      <div class="usage-stat-value">${u.totalUSD ?? '—'}</div>
+      <div class="usage-stat-sub">${esc(u.statPeriod || '')}</div>
+    </div>`;
+    // 周期总 Token
+    if(u.totalTokens != null){
+      const tokM = (u.totalTokens / 1e6).toFixed(1);
+      html += `<div class="usage-stat">
+        <div class="usage-stat-label">周期总 Token</div>
+        <div class="usage-stat-value">${tokM}M</div>
+        <div class="usage-stat-sub">${fmtNum(u.totalTokens)} tokens</div>
+      </div>`;
+    }
+    // 最近计费日
+    if(ld.date){
+      html += `<div class="usage-stat">
+        <div class="usage-stat-label">最近计费日 <span title="${esc(ld.note||'')}" style="cursor:help">ⓘ</span></div>
+        <div class="usage-stat-value">${ld.costUSD != null ? ld.costUSD.toFixed(4) : '—'}</div>
+        <div class="usage-stat-sub">${esc(ld.date)}｜${ld.tokens != null ? fmtNum(ld.tokens)+' tokens' : ''}</div>
+      </div>`;
+    }
+    html += '</div>';
+
+    // ── 模型分布 ──
+    const periodLabel = u.statPeriod ? ` <span class="period-label">${esc(u.statPeriod)}</span>` : '';
+    html += `<div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-3);margin-bottom:0.4rem;font-weight:500">模型分布${periodLabel}</div>`;
+
+    if(!models.length){
+      html += '<div style="color:var(--text-3);font-size:0.82rem;padding:0.8rem 0">暂无模型数据</div>';
+    } else {
+      html += `<table class="model-table">
+        <thead><tr><th>模型</th><th>花费 (USD)</th><th>占比</th><th style="width:120px"></th></tr></thead>
+        <tbody>${models.map((m, i) => `
+          <tr>
+            <td>${esc(m.model || m.id)}</td>
+            <td class="mono">${m.costUSD != null ? '$'+m.costUSD.toFixed(4) : '—'}</td>
+            <td class="mono">${m.pct}%</td>
+            <td><div class="model-bar" style="width:${m.pct}%;background:${i===0?'var(--accent)':i===1?'#e04850':'#7b6f9e'}"></div></td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    el.innerHTML=html;
+
   }catch(e){
-    el.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
+    el.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>加载失败：${esc(e.message)}</div>`;
   }
 }
 

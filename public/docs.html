@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>卷宗 · 老巢</title>
 <link rel="icon" href="/avatars/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +19,7 @@
         <h1 class="topbar-title">老巢</h1>
         <span class="topbar-sub">话事厅 · Darknet Operations</span>
       </div>
-      <div class="topbar-right"><span class="clock" id="clock">—</span></div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span><a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a></div>
     </header>
 
     <main class="page">
@@ -47,8 +46,11 @@
       </div>
 
       <div class="doc-layout">
-        <aside class="doc-list" id="doc-list">
-          <div class="loading">载入中…</div>
+        <aside class="doc-list" id="doc-list-wrap">
+          <div id="doc-list" class="doc-list-inner">
+            <div class="loading">载入中…</div>
+          </div>
+          <div id="pagination-bar" class="pagination"></div>
         </aside>
         <section class="doc-viewer" id="doc-viewer">
           <div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>
@@ -73,6 +75,8 @@ const BOT_EMOJI={main:'🏴',content:'🧠',tech:'⌨️',intel:'🕵',assistant
 let currentTab='memory';
 let currentBot='all';
 let currentDocId=null;
+let currentPage=1;
+const PAGE_SIZE=20;
 
 // ── Minimal markdown renderer（够用即可，不引外部库）──────
 function renderMarkdown(src){
@@ -129,11 +133,14 @@ async function loadDocs(){
   filterBar.style.display = currentTab==='docs' ? '' : 'none';
 
   try{
-    const qs=`type=${currentTab}` + (currentTab==='docs' && currentBot!=='all' ? `&bot=${currentBot}` : '');
+    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + (currentTab==='docs' && currentBot!=='all' ? `&bot=${currentBot}` : '');
     const data=await fetch(`/api/docs?${qs}`).then(r=>r.json());
     const docs=data.docs||[];
+    const total=data.total||0;
+    const totalPages=data.totalPages||1;
     if(!docs.length){
       list.innerHTML='<div class="empty"><span class="empty-icon">📄</span>暂无卷宗</div>';
+      renderPagination(0, 1, 1);
       return;
     }
     list.innerHTML=docs.map(d=>`
@@ -146,13 +153,38 @@ async function loadDocs(){
         ${d.botId?`<div class="doc-item-bot">${BOT_EMOJI[d.botId]||'●'} ${esc(BOT_NAMES[d.botId]||d.botId)}</div>`:''}
       </div>`).join('');
 
-    // 自动打开第一条
+    renderPagination(total, currentPage, totalPages);
+
+    // 自动打开第一条（仅第一页且无已选文档时）
     if(!currentDocId && docs[0]){
       openDoc(docs[0].id, list.querySelector('.doc-item'));
     }
   }catch(e){
     list.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
+    renderPagination(0, 1, 1);
   }
+}
+
+function renderPagination(total, page, totalPages){
+  const bar=document.getElementById('pagination-bar');
+  if(!bar) return;
+  if(totalPages<=1&&total>0){
+    bar.innerHTML='';
+    return;
+  }
+  bar.innerHTML=`
+    <button class="btn ghost sm" onclick="changePage(${page-1})" ${page<=1?'disabled':''}>← 上页</button>
+    <span class="pagination-info">${page} / ${totalPages}${total?' · '+total+'条':''}</span>
+    <button class="btn ghost sm" onclick="changePage(${page+1})" ${page>=totalPages?'disabled':''}>下页 →</button>
+  `;
+}
+
+function changePage(p){
+  if(p<1) return;
+  currentPage=p;
+  currentDocId=null;
+  document.getElementById('doc-viewer').innerHTML='<div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>';
+  loadDocs();
 }
 
 async function openDoc(id, el){
@@ -218,6 +250,7 @@ async function openDoc(id, el){
 function switchTab(tab,btn){
   currentTab=tab;
   currentDocId=null;
+  currentPage=1;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('doc-viewer').innerHTML='<div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>';
@@ -227,6 +260,7 @@ function switchTab(tab,btn){
 function applyBotFilter(bot,btn){
   currentBot=bot;
   currentDocId=null;
+  currentPage=1;
   document.querySelectorAll('#bot-filter-bar .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   loadDocs();

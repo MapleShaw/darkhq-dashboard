@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老巢 · Headroom</title>
+<link rel="icon" href="/avatars/logo.png">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.headroom-grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:1rem; margin-bottom:1.5rem; }
+.headroom-card { background:var(--bg-1); border-radius:var(--r-lg); padding:1.15rem 1.25rem; box-shadow:var(--shadow-card); border:1px solid var(--line); }
+.headroom-label { font-size:0.72rem; color:var(--text-3); text-transform:uppercase; letter-spacing:0.12em; }
+.headroom-value { font-size:1.75rem; font-weight:650; letter-spacing:-0.03em; margin-top:0.55rem; font-variant-numeric:tabular-nums; }
+.headroom-value.small { font-size:1rem; line-height:1.35; letter-spacing:-0.01em; }
+.headroom-sub { font-size:0.75rem; color:var(--text-2); margin-top:0.4rem; min-height:1em; }
+.headroom-panel { background:var(--bg-1); border-radius:var(--r-lg); box-shadow:var(--shadow-card); border:1px solid var(--line); overflow:hidden; }
+.headroom-panel-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid var(--line); }
+.headroom-panel-title { font-size:0.95rem; font-weight:600; }
+.headroom-actions { display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center; }
+.headroom-pill { display:inline-flex; align-items:center; gap:0.4rem; border:1px solid var(--line); background:var(--bg-2); color:var(--text-2); border-radius:999px; padding:0.35rem 0.65rem; font-size:0.75rem; }
+.headroom-pill.ok { color:var(--ok); }
+.headroom-pill.err { color:var(--err); }
+.headroom-dot { width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; }
+.headroom-json { margin:0; padding:1rem 1.25rem; max-height:340px; overflow:auto; color:var(--text-2); font-family:var(--font-mono); font-size:0.76rem; line-height:1.55; background:rgba(0,0,0,0.18); white-space:pre-wrap; }
+.headroom-two { display:grid; grid-template-columns:1.1fr 0.9fr; gap:1.25rem; align-items:start; }
+.headroom-metric-list { list-style:none; display:flex; flex-direction:column; gap:0.7rem; padding:1rem 1.25rem; }
+.headroom-metric-list li { display:flex; justify-content:space-between; gap:1rem; padding-bottom:0.7rem; border-bottom:1px solid var(--line); font-size:0.82rem; }
+.headroom-metric-list li:last-child { border-bottom:0; padding-bottom:0; }
+.headroom-metric-list .k { color:var(--text-3); }
+.headroom-metric-list .v { color:var(--text); font-family:var(--font-mono); text-align:right; }
+@media (max-width: 1100px) { .headroom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .headroom-two { grid-template-columns:1fr; } }
+@media (max-width: 560px) { .headroom-grid { grid-template-columns:1fr; } .headroom-panel-header { align-items:flex-start; flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" data-active="headroom"></aside>
+
+  <div>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">老巢</h1>
+        <span class="topbar-sub">Headroom · Token Guard</span>
+      </div>
+      <div class="topbar-right">
+        <div class="status-chip" id="gateway-status"><span class="dot"></span><span>接线中…</span></div>
+        <span class="clock" id="clock">—</span>
+        <a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7">登出</a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Headroom</h2>
+          <p class="page-desc">本地 token 压缩代理状态、节省统计与原生 dashboard</p>
+        </div>
+        <div class="headroom-actions">
+          <span class="headroom-pill" id="headroom-status"><span class="headroom-dot"></span><span>探查中…</span></span>
+          <button class="btn ghost sm" onclick="loadHeadroom(true)">↻ 更新</button>
+        </div>
+      </div>
+
+      <section class="headroom-grid">
+        <div class="headroom-card"><div class="headroom-label">状态</div><div class="headroom-value small" id="h-status">—</div><div class="headroom-sub" id="h-status-sub">Headroom proxy</div></div>
+        <div class="headroom-card"><div class="headroom-label">请求数</div><div class="headroom-value" id="h-requests">—</div><div class="headroom-sub">API requests</div></div>
+        <div class="headroom-card"><div class="headroom-label">节省 Token</div><div class="headroom-value" id="h-saved">—</div><div class="headroom-sub" id="h-saved-sub">proxy + context layers</div></div>
+        <div class="headroom-card"><div class="headroom-label">节省比例</div><div class="headroom-value" id="h-savings-pct">—</div><div class="headroom-sub" id="h-model">model: —</div></div>
+      </section>
+
+      <div class="headroom-two">
+        <section class="headroom-panel">
+          <div class="headroom-panel-header">
+            <span class="headroom-panel-title">核心指标</span>
+            <span class="headroom-pill" id="h-version">v—</span>
+          </div>
+          <ul class="headroom-metric-list" id="h-metrics">
+            <li><span class="k">加载中</span><span class="v">—</span></li>
+          </ul>
+        </section>
+
+        <section class="headroom-panel">
+          <div class="headroom-panel-header">
+            <span class="headroom-panel-title">最近历史</span>
+            <span class="headroom-pill" id="h-history-count">history</span>
+          </div>
+          <pre class="headroom-json" id="h-history">加载中…</pre>
+        </section>
+      </div>
+
+      <section class="headroom-panel" style="margin-top:1.25rem">
+        <div class="headroom-panel-header">
+          <div>
+            <span class="headroom-panel-title">原生 Dashboard</span>
+            <div class="headroom-sub">调试时可打开 Headroom 自带页面；默认不在老巢内嵌 iframe。</div>
+          </div>
+          <div class="headroom-actions">
+            <a class="btn ghost sm" href="/api/headroom-dashboard" target="_blank" rel="noopener">新窗口打开</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script src="rail.js"></script>
+<script>
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+function fmtNum(n) {
+  n = Number(n || 0);
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function pct(n) { n = Number(n || 0); return n ? n.toFixed(n >= 10 ? 1 : 2) + '%' : '0%'; }
+function esc(str) { return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pick(obj, path, fallback) { return path.split('.').reduce((o,k)=>o && o[k] != null ? o[k] : undefined, obj) ?? fallback; }
+
+async function getJson(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  const j = await r.json();
+  if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+  return j.data || j;
+}
+
+function updateTopStatus(ok, text) {
+  const chip = document.getElementById('headroom-status');
+  chip.className = 'headroom-pill ' + (ok ? 'ok' : 'err');
+  chip.innerHTML = `<span class="headroom-dot"></span><span>${esc(text)}</span>`;
+  const gw = document.getElementById('gateway-status');
+  gw.className = 'status-chip ' + (ok ? 'ok' : 'err');
+  gw.innerHTML = `<span class="dot"></span><span>${ok ? 'Headroom 在线' : 'Headroom 离线'}</span>`;
+}
+
+function renderMetrics(health, stats) {
+  const items = [
+    ['监听服务', pick(health, 'service', '—')],
+    ['版本', pick(health, 'version', '—')],
+    ['Uptime', Math.round(pick(health, 'uptime_seconds', 0)) + 's'],
+    ['Backend', pick(health, 'config.backend', '—')],
+    ['Optimize', pick(health, 'config.optimize', false) ? 'enabled' : 'disabled'],
+    ['Cache', pick(health, 'checks.cache.status', '—')],
+    ['Rate limit', pick(health, 'checks.rate_limiter.status', '—')],
+    ['Memory', pick(health, 'checks.memory.status', '—')],
+    ['Compression workers', pick(health, 'runtime.compression_executor.max_workers', '—')],
+    ['In flight', pick(health, 'runtime.compression_executor.in_flight', '—')],
+    ['Failed requests', pick(stats, 'requests.failed', 0)],
+    ['Avg latency', pick(stats, 'latency.average_ms', 0) + 'ms'],
+  ];
+  document.getElementById('h-metrics').innerHTML = items.map(([k, v]) => `<li><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></li>`).join('');
+}
+
+async function loadHeadroom(manual) {
+  try {
+    const [health, stats, history] = await Promise.all([
+      getJson('/api/headroom/health'),
+      getJson('/api/headroom/stats?cached=1'),
+      getJson('/api/headroom/stats-history?history_mode=compact'),
+    ]);
+
+    const healthy = health.status === 'healthy' || health.ready === true;
+    updateTopStatus(healthy, healthy ? '在线' : '异常');
+    setText('h-status', healthy ? 'Healthy' : (health.status || 'Unknown'));
+    setText('h-status-sub', health.ready ? 'ready for traffic' : 'not ready');
+    setText('h-version', 'v' + (health.version || '—'));
+
+    const requests = pick(stats, 'summary.api_requests', pick(stats, 'requests.total', 0));
+    const saved = pick(stats, 'tokens.all_layers_saved', pick(stats, 'tokens.saved', pick(stats, 'summary.compression.total_tokens_removed', 0)));
+    const savingsPct = pick(stats, 'tokens.all_layers_savings_percent', pick(stats, 'tokens.savings_percent', pick(stats, 'summary.cost.savings_pct', 0)));
+    setText('h-requests', fmtNum(requests));
+    setText('h-saved', fmtNum(saved));
+    setText('h-saved-sub', 'proxy saved ' + fmtNum(pick(stats, 'tokens.proxy_compression_saved', 0)));
+    setText('h-savings-pct', pct(savingsPct));
+    setText('h-model', 'model: ' + pick(stats, 'summary.primary_model', 'unknown'));
+
+    renderMetrics(health, stats);
+    const historyRows = Array.isArray(history.history) ? history.history : (Array.isArray(history.savings_history) ? history.savings_history : []);
+    setText('h-history-count', historyRows.length + ' rows');
+    document.getElementById('h-history').textContent = JSON.stringify({ display_session: history.display_session, history: historyRows.slice(-8) }, null, 2);
+  } catch (e) {
+    updateTopStatus(false, '离线');
+    setText('h-status', 'Offline');
+    setText('h-status-sub', e.message);
+    document.getElementById('h-metrics').innerHTML = `<li><span class="k">错误</span><span class="v">${esc(e.message)}</span></li>`;
+    document.getElementById('h-history').textContent = e.message;
+  }
+}
+
+loadHeadroom(false);
+setInterval(loadHeadroom, 30000);
+</script>
+</body>
+</html>

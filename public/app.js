@@ -1,4 +1,4 @@
-/* 老巢控制台 · app.js v3.2 · 仅负责 index.html 业务 */
+/* 老巢控制台 · app.js v3.3 · 仅负责 index.html 业务 */
 
 // ── 时钟 ──────────────────────────────────────────────
 function updateClock() {
@@ -149,8 +149,10 @@ function renderBotCard(bot) {
 
   const tokenLine = `
     <div class="bot-card-meta-row">
-      <span class="key">本月 Token</span>
-      <span class="val mono">${bot.monthTokens != null ? fmtNum(bot.monthTokens) : (bot.todayTokens != null ? fmtNum(bot.todayTokens) : '—')}</span>
+      <span class="key">今日 Token</span>
+      <span class="val mono" ${bot.todayTokens == null ? 'title="ZenMux API 无 per-agent 统计，需 gateway 侧自行实现"' : ''}>
+        ${bot.todayTokens != null ? fmtNum(bot.todayTokens) : '<span style="color:var(--text-3);font-size:0.75em">— 暂无数据</span>'}
+      </span>
     </div>`;
 
   return `
@@ -320,76 +322,258 @@ function renderHeartbeat(data) {
   if (st) st.style.color = data.gatewayOnline ? '#5bffa8' : '#ff9aa0';
 }
 
-// ── Token 用量迷你卡（配额进度条版）────────────────
-// 调 /api/subscription 只拿配额窗口，轻量快速
+// ── Token 用量迷你卡 ─────────────────────────────
+
+// 全局缓存 usage 数据，供 receipt 直接用
+let _usageCache = null;
+
 async function loadTokenMini() {
   const host = document.getElementById('token-mini');
   if (!host) return;
   try {
-    const data = await fetch('/api/subscription').then((r) => r.json());
-    if (!data.ok || !data.data) {
-      host.innerHTML = `<div style="font-size:0.8rem;color:var(--warn);padding:0.6rem 0">⚠ ${esc(data.error || '未对接')}</div>`;
-      return;
-    }
-    const d = data.data;
-    const q5  = d.quota_5_hour  || {};
-    const q7  = d.quota_7_day   || {};
-    const plan = d.plan || {};
-
-    const pct5  = Math.min(100, Math.round((q5.usage_percentage  || 0) * 100));
-    const pct7  = Math.min(100, Math.round((q7.usage_percentage  || 0) * 100));
-
-    // 剩余 flows 格式化
-    const fmtFlows = (v) => v != null ? (v >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v).toString()) : '—';
-    // 重置时间：只显示 HH:MM 或「明日 HH:MM」
-    const fmtReset = (iso) => {
-      if (!iso) return '—';
-      const d = new Date(iso);
-      const sh = new Date(d.getTime() + 8 * 3600 * 1000);
-      const now = new Date(Date.now() + 8 * 3600 * 1000);
-      const prefix = sh.getUTCDate() !== now.getUTCDate() ? '明日 ' : '';
-      return prefix + String(sh.getUTCHours()).padStart(2,'0') + ':' + String(sh.getUTCMinutes()).padStart(2,'0');
-    };
-
-    // 进度条颜色：用量高时变红
-    const barColor = (pct) => pct >= 90 ? '#ff4d4d' : pct >= 70 ? '#e08a00' : 'var(--accent)';
-
+    const data = await fetch('/api/usage').then((r) => r.json());
+    const u = data.usage || {};
+    _usageCache = u;
+    const models = u.models || [];
+    const total = u.totalTokens || 0;
+    const totalUSD = u.totalUSD ? `$${parseFloat(u.totalUSD).toFixed(2)}` : null;
+    const period = u.statPeriod ? esc(u.statPeriod) : '累计';
+    const tz = u.timezone ? esc(u.timezone) : '本地时区';
+    const hasUSD = models.length && models[0].costUSD != null;
     host.innerHTML = `
-      <div class="quota-row">
-        <div class="quota-label">
-          <span>5h 窗口</span>
-          <span class="quota-meta">${fmtFlows(q5.remaining_flows)} 剩余 · 重置 ${fmtReset(q5.resets_at)}</span>
-        </div>
-        <div class="quota-bar-wrap">
-          <div class="quota-bar-track">
-            <div class="quota-bar-fill" style="width:${pct5}%;background:${barColor(pct5)}"></div>
-          </div>
-          <span class="quota-pct">${pct5}%</span>
-        </div>
+      <div class="token-mini-top">
+        ${totalUSD
+          ? `<span class="total">${totalUSD}</span>`
+          : `<span class="total">${fmtNum(total)}</span>`
+        }
       </div>
-      <div class="quota-row">
-        <div class="quota-label">
-          <span>7d 窗口</span>
-          <span class="quota-meta">${fmtFlows(q7.remaining_flows)} 剩余 · 重置 ${fmtReset(q7.resets_at)}</span>
-        </div>
-        <div class="quota-bar-wrap">
-          <div class="quota-bar-track">
-            <div class="quota-bar-fill" style="width:${pct7}%;background:${barColor(pct7)}"></div>
-          </div>
-          <span class="quota-pct">${pct7}%</span>
-        </div>
+      <div class="token-bar-stack">
+        ${models.map((m, i) => `<div class="token-bar-seg s${i}" style="width:${m.pct}%"></div>`).join('')}
       </div>
-      <div style="font-size:0.68rem;color:var(--text-3);margin-top:0.6rem;padding-top:0.5rem;border-top:0.5px solid var(--line)">
-        ${plan.tier ? `<span style="text-transform:uppercase;letter-spacing:0.05em">${esc(plan.tier)}</span> · ` : ''}到期 ${plan.expires_at ? esc(new Date(new Date(plan.expires_at).getTime()+8*3600000).toISOString().slice(0,10)) : '—'}
+      <div class="token-model">
+        ${models.slice(0, 5).map((m, i) => `
+          <div class="token-model-row">
+            <span><span class="token-bar-seg s${i}" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:0.4rem;vertical-align:middle"></span>${esc(m.model)}</span>
+            <span class="n">${hasUSD ? '$' + parseFloat(m.costUSD).toFixed(4) : fmtNum(m.tokens)} · ${m.pct}%</span>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:0.68rem;color:var(--text-3);padding-top:0.6rem;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:0.4rem;flex-wrap:wrap">
+        <span>口径：${period}</span>
+        <span>${tz}</span>
       </div>`;
   } catch (e) {
     host.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
 
+// ── Token Receipt ──────────────────────────────────────────────
+
+const RECEIPT_LOGO_LINES = [
+'      ██████       ',
+'   ██████████████  ',
+'   ██  ███  █████  ',
+'   ██████████████  ',
+'   ██  ▀▀▀  █████  ',
+'   ▝▀▀▀▀▀▀▀▀▀▀▀▘  ',
+];
+function buildLogoBlock(W = 46) {
+  return RECEIPT_LOGO_LINES.map(l => {
+    const pad = Math.floor((W - l.length) / 2);
+    return ' '.repeat(Math.max(0, pad)) + l;
+  }).join('\n');
+}
+
+const RECEIPT_FOOTERS = [
+  'QUOTA IS NOT BUDGET. BUDGET IS VIBES.',
+  'THE SESSION ENDED. THE TOKENS DID NOT.',
+  "LAST PROMPT WASN'T THE LAST.",
+  'DARK HQ WATCHED. TOKENS BURNED.',
+  '老巢还在。预算死了。',
+  '消耗稳了。钱包动了。',
+  '每一个 token，都是你的选择。',
+  'THE LOGO LOOKS CALM. THE BILL DOES NOT.',
+];
+
+// 计算字符串的视觉宽度（CJK 字符算 2 宽）
+function rcptWidth(s) {
+  let w = 0;
+  for (const c of s) { w += (c.charCodeAt(0) > 0x7f) ? 2 : 1; }
+  return w;
+}
+function rcptLine(left, right, W = 46) {
+  const gap = W - rcptWidth(left) - rcptWidth(right);
+  if (gap <= 0) return left + ' ' + right;
+  return left + ' '.repeat(gap) + right;
+}
+function rcptHr(ch = '━', W = 46) { return ch.repeat(W); }
+function rcptCenter(s, W = 46) {
+  const vw = rcptWidth(s);
+  if (vw >= W) return s;
+  const pad = Math.floor((W - vw) / 2);
+  return ' '.repeat(pad) + s;
+}
+function rcptBar(pct, width = 20) {
+  const f = pct > 0 ? Math.max(1, Math.round(pct * width)) : 0;
+  return '█'.repeat(f) + '░'.repeat(width - f);
+}
+function rcptBarcode(seed, W = 46) {
+  const chars = ['███','██','█','▊','▎'];
+  let h = 5381;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) + h) ^ seed.charCodeAt(i);
+  let s = '';
+  for (let i = 0; i < W; i++) { h = ((h << 5) + h) ^ i; s += chars[Math.abs(h) % chars.length][0]; }
+  return s;
+}
+
+function buildReceipt(u) {
+  const W = 46;
+  const models = u.models || [];
+  const totalUSD = u.totalUSD ? parseFloat(u.totalUSD) : null;
+  const period = u.statPeriod || 'N/A';
+  const tz = u.timezone || 'Asia/Shanghai';
+  const sub = u.subscription || {};
+  const plan = sub.plan || {};
+  const q7 = sub.quota_7_day || {};
+  const q5h = sub.quota_5_hour || {};
+  const now = new Date().toLocaleString('zh-CN', { timeZone: tz, hour12: false });
+  const receiptId = 'DH_' + Date.now().toString(36).toUpperCase();
+  const footer = RECEIPT_FOOTERS[Math.floor(Math.random() * RECEIPT_FOOTERS.length)];
+  const hasUSD = models.length && models[0].costUSD != null;
+
+  const rows = [];
+
+  // Logo + header
+  rows.push(buildLogoBlock(W));
+  rows.push('');
+  rows.push(rcptCenter('老巢指挥部', W));
+  rows.push(rcptCenter('DARK HQ COMMAND', W));
+  rows.push('');
+  rows.push(rcptCenter('感谢你让 token 为老巢发光发热', W));
+  rows.push(rcptLine('RECEIPT #:', receiptId, W));
+  rows.push(rcptLine('DATE:', now, W));
+  rows.push(rcptHr('━', W));
+
+  // Meta
+  rows.push(rcptLine('SOURCE', 'ZenMux API', W));
+  if (plan.tier) {
+    rows.push(rcptLine('PLAN', plan.tier.toUpperCase() + ' · $' + plan.amount_usd + '/mo', W));
+  }
+  rows.push(rcptLine('PERIOD', period, W));
+  rows.push(rcptHr('─', W));
+
+  // 模型明细
+  rows.push(rcptLine('MODEL', hasUSD ? 'COST       PCT' : 'TOKENS     PCT', W));
+  rows.push(rcptHr('─', W));
+  models.forEach((m) => {
+    const name = m.model.length > 26 ? m.model.slice(0, 24) + '..' : m.model;
+    const costStr = hasUSD
+      ? ('$' + parseFloat(m.costUSD).toFixed(4)).padStart(8)
+      : String(m.tokens || 0).padStart(9);
+    const right = costStr + '  ' + String(m.pct).padStart(2) + '%';
+    rows.push(rcptLine(name, right, W));
+  });
+
+  rows.push(rcptHr('━', W));
+  if (totalUSD != null) {
+    rows.push(rcptLine('TOTAL SPEND', ('$' + totalUSD.toFixed(4)).padStart(12), W));
+  }
+
+  // 配额
+  if (q7.used_value_usd != null) {
+    rows.push(rcptHr('─', W));
+    rows.push(rcptLine('QUOTA 7D', '$' + q7.used_value_usd + ' / $' + q7.max_value_usd, W));
+    rows.push('  [' + rcptBar(q7.usage_percentage || 0, 22) + '] ' + Math.round((q7.usage_percentage || 0) * 100) + '%');
+  }
+  if (q5h.used_value_usd != null) {
+    rows.push(rcptLine('QUOTA 5H', '$' + q5h.used_value_usd + ' / $' + q5h.max_value_usd, W));
+    rows.push('  [' + rcptBar(q5h.usage_percentage || 0, 22) + '] ' + Math.round((q5h.usage_percentage || 0) * 100) + '%');
+  }
+
+  rows.push(rcptHr('━', W));
+  rows.push(rcptCenter(footer, W));
+  rows.push('');
+  rows.push(rcptBarcode(receiptId, W));
+  rows.push(rcptCenter(receiptId, W));
+
+  return rows.join('\n');
+}
+
+async function showReceipt() {
+  const overlay = document.getElementById('receipt-overlay');
+  const paper = document.getElementById('receipt-paper');
+  const modal = overlay.querySelector('.receipt-modal');
+
+  // 重置状态
+  overlay.classList.remove('open');
+  paper.textContent = '';
+  modal.classList.remove('receipt-printing', 'receipt-done');
+
+  // 先显示打印机外壳
+  overlay.classList.add('open');
+  modal.classList.add('receipt-printing');
+
+  try {
+    const data = _usageCache
+      ? { usage: _usageCache }
+      : await fetch('/api/usage').then((r) => r.json());
+    const receiptText = buildReceipt(data.usage || data);
+
+    // 逐行打印动画
+    const lines = receiptText.split('\n');
+    paper.textContent = '';
+    let i = 0;
+    const printLine = () => {
+      if (i < lines.length) {
+        paper.textContent += (i === 0 ? '' : '\n') + lines[i];
+        i++;
+        // 滚动到底部
+        paper.scrollTop = paper.scrollHeight;
+        // 模拟打印机节奏：内容行快，分隔线稍慢
+        const line = lines[i - 1];
+        const delay = (line.includes('━') || line.includes('─')) ? 60 :
+                      line.trim() === '' ? 20 : 28;
+        setTimeout(printLine, delay);
+      } else {
+        modal.classList.remove('receipt-printing');
+        modal.classList.add('receipt-done');
+        // 打印完成后显示操作按钮
+        const actions = document.getElementById('receipt-actions');
+        if (actions) actions.style.display = 'flex';
+      }
+    };
+    // 打印机预热延迟
+    setTimeout(printLine, 400);
+  } catch (e) {
+    modal.classList.remove('receipt-printing');
+    paper.textContent = '打印失败：' + e.message;
+    const actions = document.getElementById('receipt-actions');
+    if (actions) actions.style.display = 'flex';
+  }
+}
+
+function closeReceipt(e) {
+  if (e.target === document.getElementById('receipt-overlay')) {
+    const overlay = document.getElementById('receipt-overlay');
+    overlay.classList.remove('open');
+    const actions = document.getElementById('receipt-actions');
+    if (actions) actions.style.display = 'none';
+  }
+}
+
+function copyReceipt() {
+  const text = document.getElementById('receipt-paper').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.receipt-actions button');
+    const orig = btn.textContent;
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
 // ── 统一刷新 ──────────────────────────────────────
 function loadAll() {
   loadBots();
+  fetch("/api/version").then(r=>r.json()).then(d=>{if(d.ok){const el=document.getElementById("sys-version");if(el)el.textContent="v"+d.version;}}).catch(()=>{});
   loadCronPreview();
   loadSignalPreview();
   loadTokenMini();

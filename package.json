@@ -1,6 +1,6 @@
 {
   "name": "darkhq-dashboard",
-  "version": "3.3.2",
+  "version": "3.3.4",
   "description": "老巢 · OpenClaw 多 Bot 舰队控制台（香港黑帮主题）",
   "main": "server.js",
   "engines": {
@@ -11,10 +11,15 @@
     "dev": "MOCK=1 node server.js",
     "test": "echo \"no test specified\" && exit 0"
   },
-  "keywords": ["openclaw", "dashboard", "agent"],
+  "keywords": [
+    "openclaw",
+    "dashboard",
+    "agent"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "node-fetch": "^2.7.0"

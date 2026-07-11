@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>老巢 · 堂口</title>
 <link rel="icon" href="/avatars/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -35,6 +34,7 @@
           <span class="dot"></span><span>接线中…</span>
         </div>
         <span class="clock" id="clock">—</span>
+        <a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a>
       </div>
     </header>
 
@@ -114,7 +114,10 @@
           <section class="card">
             <div class="card-title">
               Token 用量
-              <a href="/usage.html" class="meta">详情 →</a>
+              <div style="display:flex;align-items:center;gap:0.6rem">
+                <button class="receipt-btn" id="receipt-btn" onclick="showReceipt()" title="打印小票">🧾 打单</button>
+                <a href="/settings.html" class="meta">详情 →</a>
+              </div>
             </div>
             <div class="token-mini" id="token-mini">
               <div class="loading">载入中…</div>
@@ -125,7 +128,7 @@
           <section class="card">
             <div class="card-title">系统</div>
             <div class="info-list">
-              <div class="info-item"><span class="label">版本</span><span class="value">v3.2</span></div>
+              <div class="info-item"><span class="label">版本</span><span class="value" id="sys-version">v—</span></div>
               <div class="info-item"><span class="label">域名</span><span class="value">darkhq.indiehacker.fun</span></div>
               <div class="info-item"><span class="label">证书</span><span class="value">2026-07-31</span></div>
             </div>
@@ -139,5 +142,16 @@
 
 <script src="rail.js"></script>
 <script src="app.js"></script>
+<!-- ── Receipt Modal ─────────────────────────────────── -->
+<div class="receipt-overlay" id="receipt-overlay" onclick="closeReceipt(event)">
+  <div class="receipt-modal">
+    <div class="receipt-printer-light"></div>
+    <pre class="receipt-paper" id="receipt-paper"></pre>
+    <div class="receipt-actions" id="receipt-actions" style="display:none">
+      <button onclick="copyReceipt()">复制</button>
+      <button onclick="document.getElementById('receipt-overlay').classList.remove('open');document.getElementById('receipt-actions').style.display='none'">关闭</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

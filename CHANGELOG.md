@@ -1,5 +1,56 @@
 # CHANGELOG
 
+## v3.3.4 — 2026-05-16 · 布局修复 + 登录鉴权 + 移动端导航 + Token 说明
+
+### 修复
+- **卷宗分页布局**（`docs.html` + `style.css`）：`#pagination-bar` 原本被动态插入到 `.doc-layout` grid 容器成为第三格，挤开 doc-viewer。改为：
+  - HTML 结构重组：`<aside class="doc-list" id="doc-list-wrap">` 内嵌 `.doc-list-inner`（可滚动列表区）和 `#pagination-bar`（固定在底部）
+  - `renderPagination()` 改为直接 `getElementById('pagination-bar').innerHTML`，不再动态插入 DOM
+  - `.doc-list` 改为 `flex` 列布局，`.doc-list-inner` 有 `flex:1; overflow-y:auto`，分页栏 `flex-shrink:0`
+
+### 新增
+- **页面登录鉴权**（`server.js` + `public/login.html`）：
+  - 新增 `GET /auth/login`、`POST /auth/login`、`GET /auth/logout` 路由
+  - 新增 `public/login.html`：暗色酒红风格极简密码登录页
+  - 静态资源鉴权中间件：在 `express.static` 之前插入，检查 `dh_session` HttpOnly cookie
+  - `/auth/*` 和 `/avatars/logo.png` 白名单免鉴权（login 页资源）
+  - **若 `DASHBOARD_TOKEN` 未设置，跳过所有鉴权（向后兼容）**
+  - 各页面 topbar 加「登出」链接
+  - Cookie 有效期 7 天，手动解析（无额外依赖）
+- **移动端底部导航**（`rail.js` + `style.css`）：`@media (max-width: 640px)` 时 rail 隐藏，改为底部固定 tab bar
+  - 5 个 tab：🏴 堂口 / 📅 日程 / 📡 风声 / 📂 卷宗 / ⚙️ 设置
+  - `rail.js` 渲染完 rail 后自动追加 `.bottom-nav` 到 body
+  - 激活状态根据当前页面 URL 自动判断
+  - 底部安全区适配（`env(safe-area-inset-bottom)`），`.page` 加 `padding-bottom` 防遮挡
+
+### 改进
+- **班底今日 Token 说明**（`app.js`）：`todayTokens == null` 时改为 `— 暂无数据`（小字）并加 `title` tooltip 说明原因（ZenMux API 无 per-agent 统计）
+
+---
+
+## v3.3.3 — 2026-05-16 · totalTokens + latestDay + API 鉴权
+
+### 新增
+- `/api/usage` 新增 `totalTokens`（周期总 token 数，单位：实际 tokens）和 `latestDay`（最近计费日的花费 + token 数）
+  - ZenMux timeseries `metric=tokens` 接口，单位换算：`raw / 1000 = 实际 token 数`
+  - `latestDay` 包含 `date`、`costUSD`、`tokens`、`note`（说明延迟原因）
+  - ZenMux 今日数据约延迟 1 天，`latestDay` 为 series 最后一个 bucket，并有注释说明
+- `fetchZenMuxUsage()` 内部重构：`getPeriodRange()`、`getSeries()`、`extractLatestDay()` 抽出复用，`fetchTrend()` 同步改用新函数，消除重复代码
+- **API 鉴权中间件**（`server.js`）：所有 `/api/*` 路由统一校验
+  - 环境变量 `DASHBOARD_TOKEN` 未设置时跳过鉴权（向后兼容）
+  - 设置后支持 `Authorization: Bearer <token>` 和 `?token=xxx` 两种方式
+  - `/health` 不受影响（不走 /api 前缀）
+  - `.env` 已加注释提示行
+
+### 前端（settings.html）
+- 用量面板顶部新增 3 张 summary 卡片：周期总花费、周期总 Token（M 级显示）、最近计费日（含日期 + token 数 + ⓘ 说明）
+- 新增 `.usage-summary` / `.usage-stat` / `.usage-stat-label` / `.usage-stat-value` / `.usage-stat-sub` 样式
+
+### 说明
+- ZenMux API 无 per-agent 维度，`bots[]` 仍为空数组，班底卡今日 Token 继续显示 `—`（已在 PROJECT.md §7.6 注明）
+
+---
+
 所有值得记录的变更都会出现在这里。
 
 ## v3.3.2 — 2026-05-05 · Token 对接 + 大文件保护 + 交互细节
