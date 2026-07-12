@@ -26,14 +26,17 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">卷宗</h2>
-          <p class="page-desc">档案、聊天记录与整个团队的工作区文件</p>
+          <p class="page-desc">团队关键文件、成员专属档案与聊天记录，三类各归其位</p>
         </div>
       </div>
 
       <div class="tabs">
+        <button class="tab active" data-tab="team"   onclick="switchTab('team',this)">团队文件</button>
         <button class="tab"        data-tab="docs"   onclick="switchTab('docs',this)">档案</button>
-        <button class="tab active" data-tab="memory" onclick="switchTab('memory',this)">聊天记录</button>
-        <button class="tab"        data-tab="team"   onclick="switchTab('team',this)">团队文件</button>
+        <button class="tab"        data-tab="memory" onclick="switchTab('memory',this)">聊天记录</button>
+      </div>
+      <div id="tab-explainer" style="margin:-0.65rem 0 1rem;color:var(--text-3);font-size:0.78rem;line-height:1.6">
+        跨团队共用的系统关键文件、项目总账与暂停项目；不展示 memory。
       </div>
 
       <!-- bot 过滤，对档案和团队文件生效 -->
@@ -73,7 +76,7 @@ function fmtSize(bytes){if(!bytes)return'—';if(bytes<1024)return bytes+' B';if
 const BOT_NAMES={main:'老大',content:'洗脑专家',tech:'键盘杀手',intel:'线人',assistant:'跟班'};
 const BOT_EMOJI={main:'🏴',content:'🧠',tech:'⌨️',intel:'🕵',assistant:'🤖'};
 
-let currentTab='memory';
+let currentTab='team';
 let currentBot='all';
 let currentDocId=null;
 let currentPage=1;
@@ -151,7 +154,7 @@ async function loadDocs(){
           <span>${fmtTime(d.createdAt)}</span>
           <span>${fmtSize(d.size)}</span>
         </div>
-        ${d.botId?`<div class="doc-item-bot">${BOT_EMOJI[d.botId]||'●'} ${esc(BOT_NAMES[d.botId]||d.botId)}</div>`:''}
+        ${(d.category||d.botId)?`<div class="doc-item-bot">${d.category?esc(d.category)+' · ':''}${d.botId?(BOT_EMOJI[d.botId]||'●')+' '+esc(BOT_NAMES[d.botId]||d.botId):''}</div>`:''}
       </div>`).join('');
 
     renderPagination(total, currentPage, totalPages);
@@ -254,6 +257,12 @@ function switchTab(tab,btn){
   currentPage=1;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
+  const notes={
+    team:'跨团队共用的系统关键文件、项目总账与暂停项目；不展示 memory。',
+    docs:'按每位成员整理的身份、工具、待办、专属文档与定时产出。',
+    memory:'聊天过程记录单独存放，不与团队文件或成员档案混合。'
+  };
+  document.getElementById('tab-explainer').textContent=notes[tab]||'';
   document.getElementById('doc-viewer').innerHTML='<div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>';
   loadDocs();
 }

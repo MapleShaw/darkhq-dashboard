@@ -28,73 +28,138 @@ const CRON_DOC_DEFS = [
 
 const JOB_IDS = ['daily-english', 'soul-check', 'daily-brief', 'signal-radar', 'update-check', 'daily-log'];
 
-const TEAM_FILE_EXTS = new Set([
-  '.md', '.txt', '.json', '.json5', '.yaml', '.yml', '.js', '.mjs', '.cjs', '.ts', '.tsx',
-  '.jsx', '.py', '.sh', '.css', '.html', '.xml', '.toml', '.ini', '.conf', '.csv', '.sql',
-]);
-const TEAM_FILE_NAMES = new Set(['Dockerfile', 'Makefile', 'Procfile', 'LICENSE']);
-const TEAM_SKIP_DIRS = new Set([
-  '.git', 'node_modules', '.cache', '.npm', '.pnpm-store', '.venv', 'venv', '__pycache__',
-  'dist', 'build', 'coverage', '.next', '.openclaw',
-]);
-const TEAM_MAX_LISTED_SIZE = 2 * 1024 * 1024;
+// 卷宗采用“白名单”而不是扫描整个工作区：
+// - 团队文件：跨 Agent 的系统关键文件 + 项目总账中标为 Paused 的项目摘要
+// - 档案：各 Agent 的个人设定、专属资料与产出记录
+// memory/ 始终只属于“聊天记录”，不会从这里穿透展示。
+const VIEWABLE_MAX_SIZE = 2 * 1024 * 1024;
+const CORE_TEAM_FILES = [
+  { botId: 'main', rel: 'docs/main/project-registry.md', title: '项目总账 · Project Registry', category: '项目治理' },
+  { botId: 'main', rel: 'AGENTS.md', title: 'OpenClaw 团队协作规则', category: '系统关键' },
+  { botId: 'main', rel: 'HEARTBEAT.md', title: '主 Agent 心跳任务', category: '系统关键' },
+  { botId: 'main', rel: 'darkhq-dashboard/PROJECT.md', title: '老巢控制台 · 项目说明', category: '关键项目' },
+  { botId: 'main', rel: 'darkhq-dashboard/TODO.md', title: '老巢控制台 · 待办', category: '关键项目' },
+  { botId: 'main', rel: 'content-signal-radar/README.md', title: 'Content Signal Radar · 系统说明', category: '关键项目' },
+  { botId: 'main', rel: 'content-signal-radar/TODO.md', title: 'Content Signal Radar · 待办', category: '关键项目' },
+  { botId: 'tech', rel: 'docs/tech/运维知识-darkhq-wewerss.md', title: 'OpenClaw 运维知识 · DarkHQ / WeWeRSS', category: '系统关键' },
+];
+const PERSONAL_ARCHIVE_NAMES = ['SOUL.md', 'IDENTITY.md', 'TOOLS.md', 'TODO.md'];
 
-function isTeamTextFile(name) {
-  return TEAM_FILE_NAMES.has(name) || TEAM_FILE_EXTS.has(path.extname(name).toLowerCase());
+function workspaceFor(botId) {
+  return TEAM_WORKSPACES.find(([id]) => id === botId)?.[1] || null;
+}
+
+function makeFileEntry({ botId, rel, title, category, type = 'team' }) {
+  const root = workspaceFor(botId);
+  if (!root || rel.split('/').includes('memory')) return null;
+  const full = path.resolve(root, rel);
+  const safeRoot = path.resolve(root);
+  if (full !== safeRoot && !full.startsWith(safeRoot + path.sep)) return null;
+  try {
+    const st = fs.statSync(full);
+    if (!st.isFile() || st.size > VIEWABLE_MAX_SIZE) return null;
+    return {
+      id: `${type}-file-${botId}-${Buffer.from(rel).toString('base64url')}`,
+      type, title, botId, category,
+      createdAt: st.mtime.toISOString(), size: st.size,
+    };
+  } catch (e) { return null; }
+}
+
+function readProjectRegistry() {
+  const root = workspaceFor('main');
+  const full = root && path.join(root, 'docs', 'main', 'project-registry.md');
+  try { return fs.readFileSync(full, 'utf8'); } catch (e) { return ''; }
+}
+
+function collectPausedProjects(botFilter) {
+  if (botFilter && botFilter !== 'all' && botFilter !== 'main') return [];
+  const body = readProjectRegistry();
+  const sections = body.split(/(?=^###\s+)/m);
+  const list = [];
+  for (const section of sections) {
+    const heading = section.match(/^###\s+(.+)$/m)?.[1]?.trim();
+    const status = section.match(/^\s*-?\s*\*\*状态\*\*[：:]\s*(.+)$/mi)?.[1]?.trim();
+    if (!heading || !status || !/^Paused\b/i.test(status)) continue;
+    const id = `team-paused-${Buffer.from(heading).toString('base64url')}`;
+    list.push({
+      id, type: 'team', title: `暂停 · ${heading.replace(/^\d+\.\s*/, '')}`,
+      botId: 'main', category: '暂停项目', createdAt: null,
+      size: Buffer.byteLength(section), _body: section.trim(),
+    });
+  }
+  return list;
 }
 
 function collectTeamFiles(botFilter) {
-  const list = [];
+  const files = CORE_TEAM_FILES
+    .filter((d) => !botFilter || botFilter === 'all' || d.botId === botFilter)
+    .map(makeFileEntry).filter(Boolean);
+  return [...collectPausedProjects(botFilter), ...files]
+    .sort((a, b) => (a.category === '暂停项目' ? -1 : 0) - (b.category === '暂停项目' ? -1 : 0));
+}
+
+function collectPersonalArchives(botFilter) {
   const roots = botFilter && botFilter !== 'all'
     ? TEAM_WORKSPACES.filter(([botId]) => botId === botFilter)
     : TEAM_WORKSPACES;
-
+  const list = [];
   for (const [botId, root] of roots) {
-    if (!fs.existsSync(root)) continue;
-    const stack = [{ dir: root, depth: 0 }];
+    for (const name of PERSONAL_ARCHIVE_NAMES) {
+      const item = makeFileEntry({
+        botId, rel: name, title: name.replace('.md', ''), category: '成员专属', type: 'archive',
+      });
+      if (item) list.push(item);
+    }
+    // 每个成员 workspace/docs 下的专属文档；明确排除 memory。
+    const docsRoot = path.join(root, 'docs');
+    if (!fs.existsSync(docsRoot)) continue;
+    const stack = [docsRoot];
     while (stack.length) {
-      const { dir, depth } = stack.pop();
+      const dir = stack.pop();
       let entries = [];
       try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { continue; }
       for (const entry of entries) {
-        if (entry.name.startsWith('.')) continue;
         const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          if (depth < 8 && !TEAM_SKIP_DIRS.has(entry.name)) stack.push({ dir: full, depth: depth + 1 });
-          continue;
-        }
-        if (!entry.isFile() || !isTeamTextFile(entry.name)) continue;
-        try {
-          const st = fs.statSync(full);
-          if (st.size > TEAM_MAX_LISTED_SIZE) continue;
-          const rel = path.relative(root, full).split(path.sep).join('/');
-          list.push({
-            id: `team-${botId}-${Buffer.from(rel).toString('base64url')}`,
-            type: 'team', title: rel, botId,
-            createdAt: st.mtime.toISOString(), size: st.size,
-          });
-        } catch (e) {}
+        if (entry.isDirectory()) { if (entry.name !== 'memory') stack.push(full); continue; }
+        if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+        const rel = path.relative(root, full).split(path.sep).join('/');
+        // 已进入“团队文件”白名单的关键资料，不在个人档案重复展示。
+        if (CORE_TEAM_FILES.some((d) => d.botId === botId && d.rel === rel)) continue;
+        const item = makeFileEntry({ botId, rel, title: rel.replace(/^docs\//, ''), category: '成员文档', type: 'archive' });
+        if (item) list.push(item);
       }
     }
   }
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+function readCuratedFile(id, expectedType) {
+  const prefix = `${expectedType}-file-`;
+  if (!id.startsWith(prefix)) return null;
+  const rest = id.slice(prefix.length);
+  const sep = rest.indexOf('-');
+  if (sep < 1) return null;
+  const botId = rest.slice(0, sep);
+  const root = workspaceFor(botId);
+  if (!root) return null;
+  let rel;
+  try { rel = Buffer.from(rest.slice(sep + 1), 'base64url').toString('utf8'); } catch (e) { return null; }
+  if (rel.split('/').includes('memory')) return null;
+  const safeRoot = path.resolve(root);
+  const full = path.resolve(root, rel);
+  if (full !== safeRoot && !full.startsWith(safeRoot + path.sep)) return null;
+  const st = fs.statSync(full);
+  if (!st.isFile() || st.size > VIEWABLE_MAX_SIZE) return null;
+  return fs.readFileSync(full, 'utf8');
+}
+
 // ─── GET /api/docs ────────────────────────────────────────
 router.get('/api/docs', (req, res) => {
   const type = req.query.type || 'memory';
-  const bot  = req.query.bot  || null;
+  const bot  = req.query.bot || null;
   const { USE_MOCK, mockData } = req.app.locals;
   if (USE_MOCK) return res.json(mockData.mockDocs(type, bot));
-
-  if (type === 'team') {
-    const list = collectTeamFiles(bot);
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 20));
-    const total = list.length;
-    const totalPages = Math.max(1, Math.ceil(total / size));
-    return res.json({ ok: true, docs: list.slice((page - 1) * size, page * size), total, page, size, totalPages });
-  }
 
   if (type === 'memory') {
     const list = [];
@@ -104,87 +169,49 @@ router.get('/api/docs', (req, res) => {
         const full = path.join(MEMORY_DIR, f);
         const st = fs.statSync(full);
         list.push({
-          id: 'memory-' + f.replace('.md', ''),
-          type: 'memory',
-          title: f.replace('.md', '') + ' · 聊天底',
-          botId: null,
-          createdAt: st.mtime.toISOString(),
-          size: st.size,
+          id: 'memory-' + f.replace('.md', ''), type: 'memory',
+          title: f.replace('.md', '') + ' · 聊天记录', botId: null,
+          category: '聊天记录', createdAt: st.mtime.toISOString(), size: st.size,
         });
       }
     } catch (e) {}
-    // 分页
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 20));
-    const total = list.length;
-    const totalPages = Math.ceil(total / size);
-    const sliced = list.slice((page - 1) * size, page * size);
-    res.json({ ok: true, docs: sliced, total, page, size, totalPages });
-    return;
+    return sendPage(res, list, req.query.page, req.query.size);
   }
 
-  if (type === 'docs') {
-    const list = [];
-    try {
-      // 1. 静态文档文件
-      if (fs.existsSync(DOCS_DIR)) {
-        const botDirs = bot && bot !== 'all' ? [bot] : fs.readdirSync(DOCS_DIR);
-        for (const bid of botDirs) {
-          const dir = path.join(DOCS_DIR, bid);
-          if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
-          const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
-          for (const f of files) {
-            const full = path.join(dir, f);
-            const st = fs.statSync(full);
-            list.push({
-              id: `d-${bid}-${f.replace('.md', '')}`,
-              type: 'docs',
-              title: f.replace('.md', ''),
-              botId: bid,
-              createdAt: st.mtime.toISOString(),
-              size: st.size,
-            });
-          }
-        }
-      }
-
-      // 2. Cron runs 虚拟文档
+  if (type === 'team' || type === 'docs') {
+    const list = type === 'team' ? collectTeamFiles(bot) : collectPersonalArchives(bot);
+    if (type === 'docs') {
       const targetDefs = (bot && bot !== 'all')
         ? CRON_DOC_DEFS.filter((d) => d.botId === bot)
         : CRON_DOC_DEFS;
-
       for (const def of targetDefs) {
-        const runs = readGatewayRuns(def.jobId, 50);
-        for (const run of runs) {
+        for (const run of readGatewayRuns(def.jobId, 50)) {
           if (!run.output || run.output.length < 5) continue;
           const date = run.startedAt.slice(0, 10);
           list.push({
             id: `run-${def.jobId}-${run.startedAt.replace(/[:.]/g, '-')}`,
-            type: 'docs',
-            title: `${def.label} · ${date}`,
-            botId: def.botId,
-            createdAt: run.startedAt,
-            size: run.output.length,
-            _runOutput: run.output,
-            _runStatus: run.status,
+            type: 'docs', title: `${def.label} · ${date}`, botId: def.botId,
+            category: '成员产出', createdAt: run.startedAt, size: run.output.length,
           });
         }
       }
-
       list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } catch (e) {}
-    const cleaned = list.map(({ _runOutput, _runStatus, ...rest }) => rest);
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 20));
-    const total = cleaned.length;
-    const totalPages = Math.ceil(total / size);
-    const sliced = cleaned.slice((page - 1) * size, page * size);
-    res.json({ ok: true, docs: sliced, total, page, size, totalPages });
-    return;
+    }
+    return sendPage(res, list, req.query.page, req.query.size);
   }
 
   res.status(400).json({ ok: false, error: 'unknown type' });
 });
+
+function sendPage(res, list, pageRaw, sizeRaw) {
+  const page = Math.max(1, parseInt(pageRaw) || 1);
+  const size = Math.min(100, Math.max(1, parseInt(sizeRaw) || 20));
+  const total = list.length;
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  const docs = list.slice((page - 1) * size, page * size)
+    .map(({ _body, ...item }) => item);
+  return res.json({ ok: true, docs, total, page, size, totalPages });
+}
 
 // ─── GET /api/docs/:id ────────────────────────────────────
 router.get('/api/docs/:id', (req, res) => {
@@ -193,35 +220,24 @@ router.get('/api/docs/:id', (req, res) => {
   if (USE_MOCK) return res.json(mockData.mockDocContent(id));
 
   try {
-    if (id.startsWith('team-')) {
-      const match = id.match(/^team-([a-z]+)-(.+)$/);
-      if (!match) return res.status(404).json({ ok: false, error: 'not found' });
-      const [, botId, encoded] = match;
-      const rootEntry = TEAM_WORKSPACES.find(([id]) => id === botId);
-      if (!rootEntry) return res.status(404).json({ ok: false, error: 'workspace not found' });
-      const root = path.resolve(rootEntry[1]);
-      let rel;
-      try { rel = Buffer.from(encoded, 'base64url').toString('utf8'); } catch (e) { return res.status(400).json({ ok: false, error: 'bad file id' }); }
-      const full = path.resolve(root, rel);
-      if (full !== root && !full.startsWith(root + path.sep)) return res.status(403).json({ ok: false, error: 'invalid path' });
-      const st = fs.statSync(full);
-      if (!st.isFile() || st.size > TEAM_MAX_LISTED_SIZE || !isTeamTextFile(path.basename(full))) {
-        return res.status(400).json({ ok: false, error: 'file is not viewable' });
-      }
-      return res.json({ ok: true, id, body: fs.readFileSync(full, 'utf8') });
+    if (id.startsWith('team-paused-')) {
+      const item = collectPausedProjects('all').find((d) => d.id === id);
+      if (!item) return res.status(404).json({ ok: false, error: 'paused project not found' });
+      return res.json({ ok: true, id, body: item._body });
+    }
+    if (id.startsWith('team-file-')) {
+      const body = readCuratedFile(id, 'team');
+      if (body == null) return res.status(404).json({ ok: false, error: 'team file not found' });
+      return res.json({ ok: true, id, body });
+    }
+    if (id.startsWith('archive-file-')) {
+      const body = readCuratedFile(id, 'archive');
+      if (body == null) return res.status(404).json({ ok: false, error: 'archive file not found' });
+      return res.json({ ok: true, id, body });
     }
     if (id.startsWith('memory-')) {
       const date = id.replace('memory-', '');
       const full = path.join(MEMORY_DIR, `${date}.md`);
-      const body = fs.readFileSync(full, 'utf8');
-      return res.json({ ok: true, id, body });
-    }
-    if (id.startsWith('d-')) {
-      const rest = id.slice(2);
-      const sepIdx = rest.indexOf('-');
-      const botId = rest.slice(0, sepIdx);
-      const fname = rest.slice(sepIdx + 1);
-      const full = path.join(DOCS_DIR, botId, `${fname}.md`);
       const body = fs.readFileSync(full, 'utf8');
       return res.json({ ok: true, id, body });
     }
