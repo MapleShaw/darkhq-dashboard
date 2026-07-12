@@ -26,16 +26,17 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">卷宗</h2>
-          <p class="page-desc">兄弟们整理的档案与每日聊天底</p>
+          <p class="page-desc">档案、聊天记录与整个团队的工作区文件</p>
         </div>
       </div>
 
       <div class="tabs">
         <button class="tab"        data-tab="docs"   onclick="switchTab('docs',this)">档案</button>
-        <button class="tab active" data-tab="memory" onclick="switchTab('memory',this)">聊天底</button>
+        <button class="tab active" data-tab="memory" onclick="switchTab('memory',this)">聊天记录</button>
+        <button class="tab"        data-tab="team"   onclick="switchTab('team',this)">团队文件</button>
       </div>
 
-      <!-- bot 过滤，仅对 docs 生效 -->
+      <!-- bot 过滤，对档案和团队文件生效 -->
       <div class="filters" id="bot-filter-bar" style="display:none">
         <button class="filter-btn active" data-bot="all"       onclick="applyBotFilter('all',this)">全部兄弟</button>
         <button class="filter-btn"        data-bot="main"      onclick="applyBotFilter('main',this)">🏴 老大</button>
@@ -130,10 +131,10 @@ async function loadDocs(){
   list.innerHTML='<div class="loading">载入中…</div>';
 
   const filterBar=document.getElementById('bot-filter-bar');
-  filterBar.style.display = currentTab==='docs' ? '' : 'none';
+  filterBar.style.display = (currentTab==='docs' || currentTab==='team') ? '' : 'none';
 
   try{
-    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + (currentTab==='docs' && currentBot!=='all' ? `&bot=${currentBot}` : '');
+    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + ((currentTab==='docs' || currentTab==='team') && currentBot!=='all' ? `&bot=${currentBot}` : '');
     const data=await fetch(`/api/docs?${qs}`).then(r=>r.json());
     const docs=data.docs||[];
     const total=data.total||0;

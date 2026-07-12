@@ -240,6 +240,20 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 @media (max-width: 960px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 520px) { .stat-grid { grid-template-columns: 1fr; } }
 
+/* 风声页固定五张紧凑统计卡；保持单行，窄屏可横向滑动而不换行。 */
+.signals-page .stat-grid {
+  grid-template-columns: repeat(5, minmax(108px, 1fr));
+  gap: 0.7rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.signals-page .stat { padding: 0.8rem 1rem; min-width: 108px; }
+.signals-page .stat-value { font-size: 1.55rem; margin-top: 0.3rem; }
+.signals-page .stat-sub { margin-top: 0.2rem; }
+@media (max-width: 960px) {
+  .signals-page .stat-grid { grid-template-columns: repeat(5, minmax(108px, 1fr)); }
+}
+
 /* ── Two-Col Layout ─────────────────────────────────────── */
 .main-grid {
   display: grid;
