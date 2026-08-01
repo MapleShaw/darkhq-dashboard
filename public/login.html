@@ -7,6 +7,18 @@
 <link rel="icon" href="/avatars/logo.png">
 <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
 <link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+(function () {
+  const key = 'darkhq-theme';
+  let theme = 'dark';
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === 'light' || saved === 'dark') theme = saved;
+  } catch (_) {}
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+})();
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -29,6 +41,21 @@
   --r-md: 12px;
   --r-lg: 18px;
 }
+html[data-theme="light"] {
+  --bg-0: #f3f1ed;
+  --bg-1: #fffdf9;
+  --bg-2: #ebe8e2;
+  --bg-3: #dedad3;
+  --text: #221f20;
+  --text-2: #615b5d;
+  --text-3: #7e7678;
+  --line: rgba(42,32,35,0.10);
+  --line-2: rgba(42,32,35,0.18);
+  --accent: #a82933;
+  --accent-2: #c23843;
+  --accent-soft: rgba(168,41,51,0.10);
+  --err: #ba303b;
+}
 html { font-size: 15px; }
 body {
   background:
@@ -44,6 +71,12 @@ body {
   align-items: center;
   justify-content: center;
 }
+html[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse 900px 600px at 85% -10%, rgba(168,41,51,0.10), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 10% 100%, rgba(154,112,88,0.09), transparent 55%),
+    linear-gradient(180deg, #faf8f4 0%, var(--bg-0) 42%, #eeebe6 100%);
+}
 .login-box {
   width: 100%;
   max-width: 360px;
@@ -54,6 +87,9 @@ body {
   box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
   position: relative;
   overflow: hidden;
+}
+html[data-theme="light"] .login-box {
+  box-shadow: 0 12px 38px rgba(57,43,47,0.13), 0 1px 0 rgba(255,255,255,0.9) inset;
 }
 .login-box::before {
   content: '';
@@ -135,9 +171,29 @@ body {
   transition: background 0.15s;
 }
 .login-btn:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.login-theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-1);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font);
+  cursor: pointer;
+}
+.login-theme-toggle:hover { color: var(--text); border-color: var(--line-2); }
 </style>
 </head>
 <body>
+<button class="login-theme-toggle" type="button" data-theme-toggle aria-label="切换到浅色主题" title="切换到浅色主题">
+  <span class="theme-toggle-icon" aria-hidden="true">☀</span>
+  <span class="theme-toggle-label">浅色模式</span>
+</button>
 <div class="login-box">
   <div class="login-logo">
     <img src="/avatars/logo.png" alt="老巢" onerror="this.style.fontSize='2rem';this.outerHTML='<span style=\'font-size:2rem\'>🏴☠️</span>'">
@@ -163,6 +219,23 @@ body {
 </div>
 
 <script>
+const loginThemeButton = document.querySelector('[data-theme-toggle]');
+function syncLoginThemeButton() {
+  const light = document.documentElement.dataset.theme === 'light';
+  loginThemeButton.setAttribute('aria-label', light ? '切换到深色主题' : '切换到浅色主题');
+  loginThemeButton.setAttribute('title', light ? '切换到深色主题' : '切换到浅色主题');
+  loginThemeButton.querySelector('.theme-toggle-icon').textContent = light ? '☾' : '☀';
+  loginThemeButton.querySelector('.theme-toggle-label').textContent = light ? '深色模式' : '浅色模式';
+}
+loginThemeButton.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  document.documentElement.style.colorScheme = next;
+  try { localStorage.setItem('darkhq-theme', next); } catch (_) {}
+  syncLoginThemeButton();
+});
+syncLoginThemeButton();
+
 // Show error if ?error=1
 if (new URLSearchParams(location.search).get('error') === '1') {
   document.getElementById('login-error').classList.add('show');

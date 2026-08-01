@@ -11,6 +11,7 @@ const fs      = require('fs');
 const os      = require('os');
 const fetch   = require('node-fetch');
 const router  = express.Router();
+const { normalizeStatus, readTaskRuns } = require('../lib/task-runs');
 
 const {
   OPENCLAW_ROOT,
@@ -58,6 +59,19 @@ router.get('/api/bots', async (req, res) => {
     runtimeData.bots.forEach((b) => { runtimeMap[b.id] = b; });
   }
 
+  // 标准任务流水是“上一单结果”的事实源；runtime 仅兼容旧数据。
+  try {
+    const { DATA_CRON_RUNS } = require('../lib/config');
+    const { runs } = readTaskRuns(DATA_CRON_RUNS, { limit: 200 });
+    for (const run of runs) {
+      if (!run.actor) continue;
+      const when = Date.parse(run.finishedAt || run.startedAt || '') || 0;
+      const current = runtimeMap[run.actor] || {};
+      const currentWhen = Date.parse(current.lastTaskTime || '') || 0;
+      if (when >= currentWhen) runtimeMap[run.actor] = { ...current, lastTaskName: run.title, lastTaskTitle: run.title, lastTaskSummary: run.summary, lastTaskType: run.taskType, lastTaskTime: run.finishedAt || run.startedAt, lastTaskStatus: run.status };
+    }
+  } catch (e) { /* no task archive: keep legacy runtime */ }
+
   // 从 Gateway cron 文件直接读取各 bot 的最后任务时间
   try {
     const path = require('path');
@@ -79,7 +93,7 @@ router.get('/api/bots', async (req, res) => {
         botJobMap[aid] = {
           lastRunAtMs,
           name: (job.name || '').replace(/^[\p{Emoji}\u200d\ufe0f\s]+/u, '').trim().slice(0, 30),
-          status: stateObj.lastRunStatus === 'ok' ? 'success' : (stateObj.lastRunStatus === 'error' ? 'failed' : 'unknown'),
+          status: normalizeStatus(stateObj.lastRunStatus),
         };
       }
     });
@@ -122,8 +136,11 @@ router.get('/api/bots', async (req, res) => {
       status: rt.status || (gatewayOnline ? 'online' : 'offline'),
       currentTask: null,
       lastTaskName: rt.lastTaskName || null,
+      lastTaskTitle: rt.lastTaskTitle || rt.lastTaskName || null,
+      lastTaskSummary: rt.lastTaskSummary || null,
+      lastTaskType: rt.lastTaskType || null,
       lastTaskTime: rt.lastTaskTime || null,
-      lastTaskStatus: rt.lastTaskStatus || 'unknown',
+      lastTaskStatus: normalizeStatus(rt.lastTaskStatus),
       weekTasks: rt.weekTasks || 0,
       todayTokens: tk.todayTokens != null ? tk.todayTokens : null,
       lastSeen: rt.lastSeen || (sessionMap[b.id] ? sessionMap[b.id] + ' (log)' : (gatewayOnline ? '活跃中' : '离线')),

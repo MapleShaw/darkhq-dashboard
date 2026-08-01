@@ -36,21 +36,30 @@ const VIEWABLE_MAX_SIZE = 2 * 1024 * 1024;
 const CORE_TEAM_FILES = [
   { botId: 'main', rel: 'docs/main/project-registry.md', title: '项目总账 · Project Registry', category: '项目治理' },
   { botId: 'main', rel: 'AGENTS.md', title: 'OpenClaw 团队协作规则', category: '系统关键' },
-  { botId: 'main', rel: 'HEARTBEAT.md', title: '主 Agent 心跳任务', category: '系统关键' },
-  { botId: 'main', rel: 'darkhq-dashboard/PROJECT.md', title: '老巢控制台 · 项目说明', category: '关键项目' },
-  { botId: 'main', rel: 'darkhq-dashboard/TODO.md', title: '老巢控制台 · 待办', category: '关键项目' },
+  { botId: 'tech', sourceBotId: 'main', rel: 'darkhq-dashboard/PROJECT.md', title: '老巢控制台 · 项目说明', category: '关键项目 · tech维护', tags: ['tech', 'canonical:main'] },
   { botId: 'main', rel: 'content-signal-radar/README.md', title: 'Content Signal Radar · 系统说明', category: '关键项目' },
   { botId: 'main', rel: 'content-signal-radar/TODO.md', title: 'Content Signal Radar · 待办', category: '关键项目' },
   { botId: 'tech', rel: 'docs/tech/运维知识-darkhq-wewerss.md', title: 'OpenClaw 运维知识 · DarkHQ / WeWeRSS', category: '系统关键' },
 ];
+const CORE_MANUAL_FILES = [
+  {
+    botId: 'main',
+    rel: 'docs/main/ai-image-video-399-1v1-sop-v0.1.md',
+    title: '核心手册 · AI 图片/视频 399 元 1V1 SOP',
+    category: '核心手册',
+    tags: ['置顶', '客户交付', '1V1'],
+    pinned: true,
+  },
+];
+const CURATED_FILE_DEFS = [...CORE_TEAM_FILES, ...CORE_MANUAL_FILES];
 const PERSONAL_ARCHIVE_NAMES = ['SOUL.md', 'IDENTITY.md', 'TOOLS.md', 'TODO.md'];
 
 function workspaceFor(botId) {
   return TEAM_WORKSPACES.find(([id]) => id === botId)?.[1] || null;
 }
 
-function makeFileEntry({ botId, rel, title, category, type = 'team' }) {
-  const root = workspaceFor(botId);
+function makeFileEntry({ botId, sourceBotId = botId, rel, title, category, type = 'team', tags = [], pinned = false }) {
+  const root = workspaceFor(sourceBotId);
   if (!root || rel.split('/').includes('memory')) return null;
   const full = path.resolve(root, rel);
   const safeRoot = path.resolve(root);
@@ -59,9 +68,9 @@ function makeFileEntry({ botId, rel, title, category, type = 'team' }) {
     const st = fs.statSync(full);
     if (!st.isFile() || st.size > VIEWABLE_MAX_SIZE) return null;
     return {
-      id: `${type}-file-${botId}-${Buffer.from(rel).toString('base64url')}`,
-      type, title, botId, category,
-      createdAt: st.mtime.toISOString(), size: st.size,
+      id: `${type}-file-${sourceBotId}-${Buffer.from(rel).toString('base64url')}`,
+      type, title, botId, sourceBotId, category, tags, pinned,
+      maintainerBotId: botId, createdAt: st.mtime.toISOString(), size: st.size,
     };
   } catch (e) { return null; }
 }
@@ -99,6 +108,14 @@ function collectTeamFiles(botFilter) {
     .sort((a, b) => (a.category === '暂停项目' ? -1 : 0) - (b.category === '暂停项目' ? -1 : 0));
 }
 
+function collectCoreManuals(botFilter) {
+  return CORE_MANUAL_FILES
+    .filter((d) => !botFilter || botFilter === 'all' || d.botId === botFilter)
+    .map((d) => makeFileEntry({ ...d, type: 'manual' }))
+    .filter(Boolean)
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 function collectPersonalArchives(botFilter) {
   const roots = botFilter && botFilter !== 'all'
     ? TEAM_WORKSPACES.filter(([botId]) => botId === botFilter)
@@ -125,7 +142,7 @@ function collectPersonalArchives(botFilter) {
         if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
         const rel = path.relative(root, full).split(path.sep).join('/');
         // 已进入“团队文件”白名单的关键资料，不在个人档案重复展示。
-        if (CORE_TEAM_FILES.some((d) => d.botId === botId && d.rel === rel)) continue;
+        if (CURATED_FILE_DEFS.some((d) => (d.sourceBotId || d.botId) === botId && d.rel === rel)) continue;
         const item = makeFileEntry({ botId, rel, title: rel.replace(/^docs\//, ''), category: '成员文档', type: 'archive' });
         if (item) list.push(item);
       }
@@ -178,8 +195,8 @@ router.get('/api/docs', (req, res) => {
     return sendPage(res, list, req.query.page, req.query.size);
   }
 
-  if (type === 'team' || type === 'docs') {
-    const list = type === 'team' ? collectTeamFiles(bot) : collectPersonalArchives(bot);
+  if (type === 'manuals' || type === 'team' || type === 'docs') {
+    const list = type === 'manuals' ? collectCoreManuals(bot) : (type === 'team' ? collectTeamFiles(bot) : collectPersonalArchives(bot));
     if (type === 'docs') {
       const targetDefs = (bot && bot !== 'all')
         ? CRON_DOC_DEFS.filter((d) => d.botId === bot)
@@ -224,6 +241,11 @@ router.get('/api/docs/:id', (req, res) => {
       const item = collectPausedProjects('all').find((d) => d.id === id);
       if (!item) return res.status(404).json({ ok: false, error: 'paused project not found' });
       return res.json({ ok: true, id, body: item._body });
+    }
+    if (id.startsWith('manual-file-')) {
+      const body = readCuratedFile(id, 'manual');
+      if (body == null) return res.status(404).json({ ok: false, error: 'manual file not found' });
+      return res.json({ ok: true, id, body });
     }
     if (id.startsWith('team-file-')) {
       const body = readCuratedFile(id, 'team');

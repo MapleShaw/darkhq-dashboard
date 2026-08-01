@@ -129,6 +129,7 @@ app.use('/api', (req, res, next) => {
 // ── 路由挂载 ───────────────────────────────────────────────
 app.use(require('./routes/bots'));
 app.use(require('./routes/cron'));
+app.use(require('./routes/task-runs'));
 app.use(require('./routes/signals'));
 app.use(require('./routes/sources'));
 app.use(require('./routes/wewe'));

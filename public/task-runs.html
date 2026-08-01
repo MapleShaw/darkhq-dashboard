@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务流水 · 老巢</title>
+<link rel="icon" href="/avatars/logo.png">
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="rail" data-active="tasks"></aside>
+
+  <div>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title">老巢</h1>
+        <span class="topbar-sub">Bot Dynamic Task Runs</span>
+      </div>
+      <div class="topbar-right"><span class="clock" id="clock">—</span><a href="/auth/logout" style="font-size:0.72rem;color:var(--text-3);text-decoration:none;margin-left:0.5rem;opacity:0.7" title="登出">登出</a></div>
+    </header>
+
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">任务流水</h2>
+          <p class="page-desc">所有 Bot 动态任务回写；独立于定时任务 / cron 例牌。</p>
+        </div>
+        <button class="btn ghost sm" onclick="loadTaskRuns()">↻ 更新</button>
+      </div>
+
+      <section class="stat-grid">
+        <div class="stat"><div class="stat-label">总流水</div><div class="stat-value" id="task-total">—</div><div class="stat-sub">当前筛选</div></div>
+        <div class="stat"><div class="stat-label">搞掂</div><div class="stat-value" id="task-success">—</div><div class="stat-sub ok">真实 success</div></div>
+        <div class="stat"><div class="stat-label">待跟进</div><div class="stat-value" id="task-warn">—</div><div class="stat-sub">确认 / 开工中</div></div>
+        <div class="stat"><div class="stat-label">跳过坏档</div><div class="stat-value" id="task-skipped">—</div><div class="stat-sub err">容错计数</div></div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">动态任务 <span class="meta">Bot 主动回写 · 非 cron 例牌</span></div>
+        <div class="task-run-toolbar">
+          <label>执行者
+            <select class="input" id="task-run-actor">
+              <option value="">全部</option>
+              <option value="main">老大 main</option>
+              <option value="assistant">跟班 assistant</option>
+              <option value="content">洗脑专家 content</option>
+              <option value="intel">线人 intel</option>
+              <option value="tech">键盘杀手 tech</option>
+            </select>
+          </label>
+          <label>状态
+            <select class="input" id="task-run-status">
+              <option value="">全部</option>
+              <option value="success">搞掂</option>
+              <option value="failed">失手</option>
+              <option value="needs_confirmation">等确认</option>
+              <option value="running">开工中</option>
+              <option value="unknown">未知</option>
+            </select>
+          </label>
+        </div>
+        <div class="task-run-list" id="task-runs"><div class="loading">载入中…</div></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="rail.js"></script>
+<script src="task-runs.js"></script>
+</body>
+</html>

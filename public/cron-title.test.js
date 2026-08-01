@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('assert');
+const { stripLeadingEmoji } = require('./cron-title');
+assert.strictEqual(stripLeadingEmoji('📡 Content Signal Radar'), 'Content Signal Radar');
+assert.strictEqual(stripLeadingEmoji('Content Signal Radar'), 'Content Signal Radar');
+assert.strictEqual(stripLeadingEmoji('👨‍💻 Build'), 'Build');
+assert.strictEqual(stripLeadingEmoji('🇭🇰 Hong Kong'), 'Hong Kong');
+assert.strictEqual(stripLeadingEmoji('⚙️ Configure'), 'Configure');
+assert.strictEqual(stripLeadingEmoji('📡📡 Double'), 'Double');
+console.log('cron-title tests: ok');

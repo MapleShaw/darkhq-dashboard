@@ -7,6 +7,7 @@
 <link rel="icon" href="/avatars/logo.png">
 <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
 <link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,20 +27,26 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">日程</h2>
-          <p class="page-desc">例牌与定时差事的出勤记录</p>
+          <p class="page-desc">例牌定时任务与 Bot 动态任务流水分开看</p>
         </div>
-        <button class="btn ghost sm" onclick="loadCronFull()">↻ 更新</button>
+        <button class="btn ghost sm" onclick="loadAllCronPage()">↻ 更新</button>
       </div>
 
       <section class="stat-grid">
         <div class="stat"><div class="stat-label">总数</div><div class="stat-value" id="cron-total">—</div><div class="stat-sub">条例牌</div></div>
-        <div class="stat"><div class="stat-label">在跑</div><div class="stat-value" id="cron-enabled">—</div><div class="stat-sub ok">运转中</div></div>
+        <div class="stat"><div class="stat-label">启用</div><div class="stat-value" id="cron-enabled">—</div><div class="stat-sub ok">未暂停</div></div>
         <div class="stat"><div class="stat-label">搞掂</div><div class="stat-value" id="cron-success">—</div><div class="stat-sub">上一轮</div></div>
         <div class="stat"><div class="stat-label">失手</div><div class="stat-value" id="cron-failed">—</div><div class="stat-sub err">要跟进</div></div>
       </section>
 
+      <section class="card cron-task-runs-card">
+        <div class="card-title">任务流水 <span class="meta">Bot 主动回写 · 非 cron 例牌</span></div>
+        <p class="page-desc" style="margin-top:0.2rem">任务流水已独立成页，避免同例牌定时任务混淆。</p>
+        <a class="btn ghost sm" href="/task-runs.html">打开任务流水 →</a>
+      </section>
+
       <section class="card">
-        <div class="card-title">全部例牌 <span class="meta">点行展开睇近 10 次出勤</span></div>
+        <div class="card-title">全部例牌 <span class="meta">定时 cron · 点行展开睇近 10 次出勤</span></div>
         <div class="cron-list" id="cron-full"><div class="loading">载入中…</div></div>
       </section>
     </main>
@@ -47,6 +54,7 @@
 </div>
 
 <script src="rail.js"></script>
+<script src="cron-title.js"></script>
 <script>
 function updateClock(){const n=new Date();const e=document.getElementById('clock');if(e)e.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');}
 setInterval(updateClock,1000);updateClock();
@@ -54,10 +62,25 @@ setInterval(updateClock,1000);updateClock();
 function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtTime(iso){if(!iso)return'—';try{const d=new Date(iso);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}catch(e){return iso;}}
 function fmtDur(ms){if(ms==null)return'—';if(ms<1000)return ms+'ms';return(ms/1000).toFixed(1)+'s';}
-function statusBadge(s){const key=(s||'unknown').toLowerCase();const map={success:['ok','搞掂'],ok:['ok','搞掂'],failed:['err','失手'],error:['err','失手'],running:['warn','开工中'],unknown:['dim','未知']};const[cls,label]=map[key]||['dim','未知'];return`<span class="badge ${cls}">${label}</span>`;}
-function runDotColor(st){return{success:'var(--ok)',ok:'var(--ok)',failed:'var(--err)',error:'var(--err)',running:'var(--warn)'}[st]||'var(--text-3)';}
+function statusBadge(s){const key=(s||'unknown').toLowerCase();const map={success:['ok','搞掂'],ok:['ok','搞掂'],failed:['err','失手'],error:['err','失手'],needs_confirmation:['warn','等确认'],running:['warn','开工中'],disabled:['dim','已暂停'],unknown:['dim','未知']};const[cls,label]=map[key]||['dim',s||'未知'];return`<span class="badge ${cls}">${esc(label)}</span>`;}
+function jobStatusBadge(job){if(job&&job.enabled===false)return '<span class="badge dim">已暂停</span>';return statusBadge(job&&job.lastRunStatus||job&&job.status);}
+function runStatusText(job){if(!job)return '—';return job.lastRunStatus||job.status||'unknown';}
+function sourceNotice(data){if(!data||(!data.source&&!data.warning))return '';const cls=data.stale?'warn':'ok';const label=data.source||'unknown';const warn=data.warning?' · '+data.warning:'';return `<div class="cron-source-note ${cls}">事实源：${esc(label)}${esc(warn)}</div>`;}
+function runDotColor(st){return{success:'var(--ok)',ok:'var(--ok)',failed:'var(--err)',error:'var(--err)',needs_confirmation:'var(--warn)',running:'var(--warn)'}[st]||'var(--text-3)';}
+function actorLabel(a){return{main:'老大',assistant:'跟班',content:'洗脑专家',intel:'线人',tech:'键盘杀手'}[a]||a||'—';}
+function modelHtml(job){
+  const label=job.modelLabel || (job.modelInherited ? '继承默认' : (job.model || '未知'));
+  const cls=job.modelInherited?'inherited':'explicit';
+  const title=job.model || label;
+  return `<span class="model-badge ${cls}" title="${esc(title)}">${esc(label)}</span>`;
+}
+
 
 let jobsCache=[];
+
+
+
+function loadAllCronPage(){loadCronFull();}
 
 async function loadCronFull(){
   const list=document.getElementById('cron-full');
@@ -73,19 +96,20 @@ async function loadCronFull(){
     document.getElementById('cron-failed').textContent=jobs.filter(j=>['failed','error'].includes((j.status||'').toLowerCase())).length;
 
     if(!jobs.length){
-      list.innerHTML='<div class="empty"><span class="empty-icon">⏰</span>冇例牌</div>';
+      list.innerHTML=sourceNotice(data)+'<div class="empty"><span class="empty-icon">⏰</span>冇例牌</div>';
       return;
     }
 
-    list.innerHTML=`
-      <div class="cron-head"><div>例牌</div><div>状态</div><div>上次</div><div>下次</div><div>时辰</div></div>
+    list.innerHTML=sourceNotice(data)+`
+      <div class="cron-head"><div>例牌</div><div>模型</div><div>主状态</div><div>上次</div><div>下次</div><div>时辰</div></div>
       ${jobs.map((job,i)=>{
         const[h,m]=(job.schedule||'00:00').split(':');
-        const cronExpr=`${m} ${h} * * *`;
+        const cronExpr=job.scheduleRaw&&job.scheduleRaw.kind==='cron' ? (job.scheduleRaw.expr||'—') : (/^\d{1,2}:\d{2}$/.test(job.schedule||'') ? `${m} ${h} * * *` : (job.schedule||'—'));
         return `
         <div class="cron-row" id="cron-row-${i}" onclick="toggleRow(${i},'${esc(job.id)}')">
-          <div class="cron-name"><span class="emoji">${job.emoji||'⚙'}</span><span class="txt">${esc(job.name)}</span></div>
-          <div>${statusBadge(job.status)}</div>
+          <div class="cron-name"><span class="emoji">${job.emoji||'⚙'}</span><span class="txt">${esc(stripLeadingEmoji(job.name))}</span></div>
+          <div class="cron-model">${modelHtml(job)}</div>
+          <div>${jobStatusBadge(job)}${job.enabled===false?`<span class="last-run-mini">上次：${esc(runStatusText(job))}</span>`:''}</div>
           <div class="cron-time">${fmtTime(job.lastRun)}</div>
           <div class="cron-time next">${fmtTime(job.nextRun)}</div>
           <div class="cron-schedule">${esc(job.schedule)}</div>
@@ -94,7 +118,9 @@ async function loadCronFull(){
               <div class="detail-field"><label>例牌 ID</label><code>${esc(job.id||'—')}</code></div>
               <div class="detail-field"><label>Cron 表达式</label><code>${cronExpr}</code></div>
               <div class="detail-field"><label>负责兄弟</label><span>${esc(job.botId||'—')}</span></div>
-              <div class="detail-field"><label>是否在跑</label><span>${job.enabled!==false?'系':'否'}</span></div>
+              <div class="detail-field"><label>启用状态</label><span>${job.enabled!==false?'启用':'已暂停'}</span></div>
+              <div class="detail-field"><label>上次运行结果</label><span>${statusBadge(runStatusText(job))}</span></div>
+              <div class="detail-field" style="grid-column:1/-1"><label>模型</label><span>${modelHtml(job)}</span></div>
               <div class="detail-field" style="grid-column:1/-1">
                 <label>近 10 次出勤</label>
                 <div class="run-history" id="run-history-${i}"><div class="loading">载入中…</div></div>
@@ -141,7 +167,7 @@ async function toggleRow(i, jobId){
   }
 }
 
-document.addEventListener('DOMContentLoaded',loadCronFull);
+document.addEventListener('DOMContentLoaded',loadAllCronPage);
 </script>
 </body>
 </html>

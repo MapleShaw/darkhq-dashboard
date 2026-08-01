@@ -7,6 +7,7 @@
 <link rel="icon" href="/avatars/logo.png">
 <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
 <link href="https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,17 +27,18 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">卷宗</h2>
-          <p class="page-desc">团队关键文件、成员专属档案与聊天记录，三类各归其位</p>
+          <p class="page-desc">核心手册置顶，团队文件、成员档案与聊天记录分层归档</p>
         </div>
       </div>
 
       <div class="tabs">
-        <button class="tab active" data-tab="team"   onclick="switchTab('team',this)">团队文件</button>
+        <button class="tab active" data-tab="manuals" onclick="switchTab('manuals',this)">核心手册</button>
+        <button class="tab"        data-tab="team"   onclick="switchTab('team',this)">团队文件</button>
         <button class="tab"        data-tab="docs"   onclick="switchTab('docs',this)">档案</button>
         <button class="tab"        data-tab="memory" onclick="switchTab('memory',this)">聊天记录</button>
       </div>
       <div id="tab-explainer" style="margin:-0.65rem 0 1rem;color:var(--text-3);font-size:0.78rem;line-height:1.6">
-        跨团队共用的系统关键文件、项目总账与暂停项目；不展示 memory。
+        置顶手册与高频 SOP，不被普通系统文档或项目文档淹没。
       </div>
 
       <!-- bot 过滤，对档案和团队文件生效 -->
@@ -76,7 +78,7 @@ function fmtSize(bytes){if(!bytes)return'—';if(bytes<1024)return bytes+' B';if
 const BOT_NAMES={main:'老大',content:'洗脑专家',tech:'键盘杀手',intel:'线人',assistant:'跟班'};
 const BOT_EMOJI={main:'🏴',content:'🧠',tech:'⌨️',intel:'🕵',assistant:'🤖'};
 
-let currentTab='team';
+let currentTab='manuals';
 let currentBot='all';
 let currentDocId=null;
 let currentPage=1;
@@ -134,10 +136,10 @@ async function loadDocs(){
   list.innerHTML='<div class="loading">载入中…</div>';
 
   const filterBar=document.getElementById('bot-filter-bar');
-  filterBar.style.display = (currentTab==='docs' || currentTab==='team') ? '' : 'none';
+  filterBar.style.display = (currentTab==='manuals' || currentTab==='docs' || currentTab==='team') ? '' : 'none';
 
   try{
-    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + ((currentTab==='docs' || currentTab==='team') && currentBot!=='all' ? `&bot=${currentBot}` : '');
+    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + ((currentTab==='manuals' || currentTab==='docs' || currentTab==='team') && currentBot!=='all' ? `&bot=${currentBot}` : '');
     const data=await fetch(`/api/docs?${qs}`).then(r=>r.json());
     const docs=data.docs||[];
     const total=data.total||0;
@@ -149,12 +151,12 @@ async function loadDocs(){
     }
     list.innerHTML=docs.map(d=>`
       <div class="doc-item ${d.id===currentDocId?'active':''}" onclick="openDoc('${esc(d.id)}',this)">
-        <div class="doc-item-title">${esc(d.title)}</div>
+        <div class="doc-item-title">${d.pinned?'📌 ':''}${esc(d.title)}</div>
         <div class="doc-item-meta">
           <span>${fmtTime(d.createdAt)}</span>
           <span>${fmtSize(d.size)}</span>
         </div>
-        ${(d.category||d.botId)?`<div class="doc-item-bot">${d.category?esc(d.category)+' · ':''}${d.botId?(BOT_EMOJI[d.botId]||'●')+' '+esc(BOT_NAMES[d.botId]||d.botId):''}</div>`:''}
+        ${(d.category||d.botId||(d.tags&&d.tags.length))?`<div class="doc-item-bot">${d.category?esc(d.category)+' · ':''}${d.tags&&d.tags.length?esc(d.tags.join(' · '))+' · ':''}${d.botId?(BOT_EMOJI[d.botId]||'●')+' '+esc(BOT_NAMES[d.botId]||d.botId):''}</div>`:''}
       </div>`).join('');
 
     renderPagination(total, currentPage, totalPages);
@@ -258,6 +260,7 @@ function switchTab(tab,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   const notes={
+    manuals:'置顶手册与高频 SOP，不被普通系统文档或项目文档淹没。',
     team:'跨团队共用的系统关键文件、项目总账与暂停项目；不展示 memory。',
     docs:'按每位成员整理的身份、工具、待办、专属文档与定时产出。',
     memory:'聊天过程记录单独存放，不与团队文件或成员档案混合。'

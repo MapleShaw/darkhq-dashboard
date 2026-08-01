@@ -39,13 +39,21 @@ function esc(str) {
   if (str == null) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+function normalizeStatus(s) {
+  const key = String(s || '').trim().toLowerCase();
+  if (!key) return 'unknown';
+  if (key === 'ok' || key === 'done' || key === 'completed' || key === 'complete') return 'success';
+  if (key === 'error' || key === 'fail' || key === 'failure') return 'failed';
+  if (key === 'need_confirmation' || key === 'needs-confirmation' || key === 'confirm' || key === 'pending_confirmation') return 'needs_confirmation';
+  if (key === 'pending' || key === 'in_progress') return 'running';
+  return key;
+}
 function statusBadge(s) {
-  const key = (s || 'unknown').toLowerCase();
+  const key = normalizeStatus(s);
   const map = {
     success: ['ok',   '搞掂'],
-    ok:      ['ok',   '搞掂'],
     failed:  ['err',  '失手'],
-    error:   ['err',  '失手'],
+    needs_confirmation: ['warn', '待确认'],
     running: ['warn', '开工中'],
     unknown: ['dim',  '未知'],
   };
@@ -54,6 +62,35 @@ function statusBadge(s) {
 }
 function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
 function fmtNum(n) { if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return String(n); }
+const INTERNAL_TASK_TYPES = new Set(['darkhq_task_flow', 'readonly_audit']);
+const TASK_TYPE_LABELS = {
+  darkhq_task_flow: 'DarkHQ 任务流水修复',
+  readonly_audit: '幽灵任务审计',
+};
+function isInternalMarker(value) {
+  const s = String(value || '').trim();
+  if (!s) return false;
+  if (TASK_TYPE_LABELS[s]) return true;
+  if (/^[a-z]+-[a-z0-9_-]+$/.test(s) || /^[a-z0-9_]+$/.test(s)) return true;
+  return false;
+}
+function cleanTaskTitle(name) {
+  const raw = String(name || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const m = raw.match(/^([a-z][a-z0-9_]{2,80})\s*[:：]\s*(.+)$/i);
+  if (m && (TASK_TYPE_LABELS[m[1]] || INTERNAL_TASK_TYPES.has(m[1]) || isInternalMarker(m[1]))) return m[2].trim();
+  return raw;
+}
+function humanTaskTitle(name) {
+  const raw = String(name || '').replace(/\s+/g, ' ').trim();
+  const cleaned = cleanTaskTitle(raw);
+  const m = raw.match(/^([a-z][a-z0-9_]{2,80})\s*[:：]\s*(.+)$/i);
+  if (m && TASK_TYPE_LABELS[m[1]]) return TASK_TYPE_LABELS[m[1]];
+  return cleaned || '—';
+}
+function humanTaskSummary(name) {
+  return cleanTaskTitle(name) || '—';
+}
 
 // ── KPI 顶部 ───────────────────────────────────────
 function updateStats({ bots, cron, signal }) {
@@ -133,10 +170,20 @@ function renderBotCard(bot) {
          <span class="val">${statusLabel === '在场' ? '候命中' : statusLabel}</span>
        </div>`;
 
-  const lastTaskLine = bot.lastTaskName
-    ? `<div class="bot-card-meta-row">
+  const lastTaskTitle = bot.lastTaskTitle || bot.lastTaskName;
+  const lastTaskSummary = bot.lastTaskSummary || bot.lastTaskName;
+  const lastTaskLine = lastTaskTitle
+    ? `<div class="bot-card-meta-row last-task">
          <span class="key">最近一单</span>
-         <span class="val">${statusBadge(bot.lastTaskStatus)} ${esc(bot.lastTaskName)}</span>
+         <span class="val task-title" title="${esc(lastTaskTitle)}"><span>${esc(humanTaskTitle(lastTaskTitle))}</span></span>
+       </div>
+       <div class="bot-card-meta-row last-task-result">
+         <span class="key">上一单结果</span>
+         <span class="val">${statusBadge(bot.lastTaskStatus)}</span>
+       </div>
+       <div class="bot-card-meta-row last-task-summary">
+         <span class="key">摘要</span>
+         <span class="val task-summary" title="${esc(lastTaskSummary)}">${esc(humanTaskSummary(lastTaskSummary))}</span>
        </div>
        <div class="bot-card-meta-row">
          <span class="key">收工</span>
@@ -209,10 +256,19 @@ async function loadCronPreview() {
     list.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
   }
 }
+function stripLeadingEmoji(name) {
+  const value = String(name == null ? '' : name);
+  const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+  const clusters = segmenter ? Array.from(segmenter.segment(value), part => part.segment) : Array.from(value);
+  let index = 0;
+  while (index < clusters.length && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(clusters[index])) index += 1;
+  return clusters.slice(index).join('').replace(/^\s+/, '');
+}
 function renderCronRow(job) {
   return `
   <div class="cron-row">
-    <div class="cron-name"><span class="emoji">${job.emoji || '⚙'}</span><span class="txt">${esc(job.name)}</span></div>
+    <div class="cron-name"><span class="emoji">${job.emoji || '⚙'}</span><span class="txt">${esc(stripLeadingEmoji(job.name))}</span></div>
     <div>${statusBadge(job.status)}</div>
     <div class="cron-time">${fmtTime(job.lastRun)}</div>
     <div class="cron-time next">${fmtTime(job.nextRun)}</div>

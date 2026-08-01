@@ -6,6 +6,7 @@
   const NAV = [
     { key: 'dashboard', href: '/',             label: '堂口', section: 'main' },
     { key: 'cron',      href: '/cron.html',    label: '日程', section: 'main' },
+    { key: 'tasks',     href: '/task-runs.html', label: '任务流水', section: 'main' },
     { key: 'signals',   href: '/signals.html', label: '风声', section: 'main' },
     { key: 'docs',      href: '/docs.html',    label: '卷宗', section: 'main' },
     { key: 'wewe',      href: '/wewe.html',    label: '微读', section: 'main' },
@@ -17,6 +18,7 @@
   const ICONS = {
     dashboard: '<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
     cron:      '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    tasks:     '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="8" cy="18" r="1.5"/>',
     signals:   '<path d="M2 12a10 10 0 0 1 20 0"/><path d="M5 12a7 7 0 0 1 14 0"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="12" r="1"/>',
     docs:      '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>',
     wewe:      '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
@@ -47,6 +49,10 @@
       <div class="rail-section-label">Workspace</div>
       ${main.map(renderItem).join('')}
       <div class="rail-spacer"></div>
+      <button class="rail-item theme-toggle" type="button" data-theme-toggle>
+        <span class="rail-icon theme-toggle-icon" aria-hidden="true">☀</span>
+        <span class="rail-label theme-toggle-label">浅色模式</span>
+      </button>
       ${bottom.map(renderItem).join('')}
     `;
   }
@@ -57,6 +63,7 @@
   const BOTTOM_TABS = [
     { key: 'dashboard', href: '/',              label: '堂口', icon: '🏴' },
     { key: 'cron',      href: '/cron.html',     label: '日程', icon: '📅' },
+    { key: 'tasks',     href: '/task-runs.html', label: '流水', icon: '📋' },
     { key: 'signals',   href: '/signals.html',  label: '风声', icon: '📡' },
     { key: 'docs',      href: '/docs.html',     label: '卷宗', icon: '📂' },
     { key: 'wewe',      href: '/wewe.html',     label: '微读', icon: '📰' },
@@ -76,7 +83,11 @@
       <a class="bottom-nav-item ${tab.key === active ? 'active' : ''}" href="${tab.href}">
         <span class="bottom-nav-icon">${tab.icon}</span>
         <span>${tab.label}</span>
-      </a>`).join('');
+      </a>`).join('') + `
+      <button class="bottom-nav-item bottom-theme-toggle" type="button" data-theme-toggle>
+        <span class="bottom-nav-icon theme-toggle-icon" aria-hidden="true">☀</span>
+        <span class="theme-toggle-label">浅色模式</span>
+      </button>`;
     document.body.appendChild(nav);
   }
 

@@ -9,7 +9,7 @@
   "scripts": {
     "start": "NODE_ENV=production node server.js",
     "dev": "MOCK=1 node server.js",
-    "test": "echo \"no test specified\" && exit 0"
+    "test": "node public/cron-title.test.js && node lib/task-runs.test.js && node scripts/darkhq-report.test.js && node routes/cron.test.js"
   },
   "keywords": [
     "openclaw",
