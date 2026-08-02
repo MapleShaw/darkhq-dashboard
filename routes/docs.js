@@ -33,6 +33,7 @@ const JOB_IDS = ['daily-english', 'soul-check', 'daily-brief', 'signal-radar', '
 // - 档案：各 Agent 的个人设定、专属资料与产出记录
 // memory/ 始终只属于“聊天记录”，不会从这里穿透展示。
 const VIEWABLE_MAX_SIZE = 2 * 1024 * 1024;
+const SEARCH_QUERY_MAX_LENGTH = 120;
 const CORE_TEAM_FILES = [
   { botId: 'main', rel: 'docs/main/project-registry.md', title: '项目总账 · Project Registry', category: '项目治理' },
   { botId: 'main', rel: 'AGENTS.md', title: 'OpenClaw 团队协作规则', category: '系统关键' },
@@ -175,6 +176,7 @@ function readCuratedFile(id, expectedType) {
 router.get('/api/docs', (req, res) => {
   const type = req.query.type || 'memory';
   const bot  = req.query.bot || null;
+  const query = normalizeSearchQuery(req.query.q);
   const { USE_MOCK, mockData } = req.app.locals;
   if (USE_MOCK) return res.json(mockData.mockDocs(type, bot));
 
@@ -192,7 +194,7 @@ router.get('/api/docs', (req, res) => {
         });
       }
     } catch (e) {}
-    return sendPage(res, list, req.query.page, req.query.size);
+    return sendPage(res, searchDocuments(list, query), req.query.page, req.query.size, query);
   }
 
   if (type === 'manuals' || type === 'team' || type === 'docs') {
@@ -214,20 +216,71 @@ router.get('/api/docs', (req, res) => {
       }
       list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
-    return sendPage(res, list, req.query.page, req.query.size);
+    return sendPage(res, searchDocuments(list, query), req.query.page, req.query.size, query);
   }
 
   res.status(400).json({ ok: false, error: 'unknown type' });
 });
 
-function sendPage(res, list, pageRaw, sizeRaw) {
+function normalizeSearchQuery(value) {
+  return String(value || '').trim().slice(0, SEARCH_QUERY_MAX_LENGTH);
+}
+
+function bodyForSearch(item) {
+  if (typeof item._body === 'string') return item._body;
+  try {
+    if (item.id.startsWith('manual-file-')) return readCuratedFile(item.id, 'manual') || '';
+    if (item.id.startsWith('team-file-')) return readCuratedFile(item.id, 'team') || '';
+    if (item.id.startsWith('archive-file-')) return readCuratedFile(item.id, 'archive') || '';
+    if (item.id.startsWith('memory-')) {
+      const name = item.id.slice('memory-'.length);
+      if (!/^[^/\\]+$/.test(name)) return '';
+      return fs.readFileSync(path.join(MEMORY_DIR, `${name}.md`), 'utf8');
+    }
+    if (item.id.startsWith('run-')) {
+      const withoutPrefix = item.id.slice(4);
+      for (const jid of JOB_IDS) {
+        if (!withoutPrefix.startsWith(jid + '-')) continue;
+        const matched = readGatewayRuns(jid, 50).find((r) =>
+          item.id === `run-${jid}-${r.startedAt.replace(/[:.]/g, '-')}`
+        );
+        return matched?.output || '';
+      }
+    }
+  } catch (e) {}
+  return '';
+}
+
+function makeSearchSnippet(body, query) {
+  const normalizedBody = String(body || '').replace(/\s+/g, ' ').trim();
+  const at = normalizedBody.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+  if (at < 0) return '';
+  const start = Math.max(0, at - 48);
+  const end = Math.min(normalizedBody.length, at + query.length + 72);
+  return `${start ? '…' : ''}${normalizedBody.slice(start, end)}${end < normalizedBody.length ? '…' : ''}`;
+}
+
+function searchDocuments(list, query) {
+  if (!query) return list;
+  const needle = query.toLocaleLowerCase();
+  return list.reduce((matched, item) => {
+    const metadata = [item.title, item.category, item.botId, ...(item.tags || [])]
+      .filter(Boolean).join(' ').toLocaleLowerCase();
+    const body = bodyForSearch(item);
+    if (!metadata.includes(needle) && !body.toLocaleLowerCase().includes(needle)) return matched;
+    matched.push({ ...item, searchSnippet: makeSearchSnippet(body, query) });
+    return matched;
+  }, []);
+}
+
+function sendPage(res, list, pageRaw, sizeRaw, query = '') {
   const page = Math.max(1, parseInt(pageRaw) || 1);
   const size = Math.min(100, Math.max(1, parseInt(sizeRaw) || 20));
   const total = list.length;
   const totalPages = Math.max(1, Math.ceil(total / size));
   const docs = list.slice((page - 1) * size, page * size)
     .map(({ _body, ...item }) => item);
-  return res.json({ ok: true, docs, total, page, size, totalPages });
+  return res.json({ ok: true, docs, total, page, size, totalPages, query });
 }
 
 // ─── GET /api/docs/:id ────────────────────────────────────
@@ -285,3 +338,4 @@ router.get('/api/docs/:id', (req, res) => {
 });
 
 module.exports = router;
+module.exports._test = { normalizeSearchQuery, makeSearchSnippet, searchDocuments };

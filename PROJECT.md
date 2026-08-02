@@ -15,8 +15,9 @@
 - 5 位 Bot 的当前状态 / 当前差事 / 最近一单
 - 全部定时例牌（cron）的运行记录与输出历史
 - 内容雷达（博客 / X / 播客）的今日风声和近 7 天旧账
-- Bot 整理的档案 + 每日聊天底
-- Bot 名称/角色配置 + Token 用量
+- 核心手册、团队文件、成员档案、聊天记录与 Cron 产出，支持全文搜索
+- Bot 名称/角色配置 + ZenMux Token / 费用用量
+- 任务流水、WeWeRSS、Headroom 与系统健康状态
 
 **不是**什么：
 - 不是 OpenClaw 的一部分，是它的下游消费方
@@ -183,8 +184,8 @@ USE_MOCK = process.env.MOCK === '1'
 | GET | `/api/cron/:jobId/runs?limit=10` | 从 `data/cron-runs/{jobId}/` 读运行历史 |
 | GET | `/api/signals?source=all\|blog\|x\|podcast` | 读 `workspace/content-signal-radar/feed-*.json`，**同时归档一份到 `data/signals-archive/{today}.json`** |
 | GET | `/api/signals/history?days=7` | 从 `data/signals-archive/*.json` 读近 N 天 |
-| GET | `/api/usage` | Token 用量。调 gateway `/api/usage`，失败用 fallback |
-| GET | `/api/docs?type=memory\|docs&bot=xxx` | 文档列表 |
+| GET | `/api/usage` | ZenMux Token / 费用用量与趋势 |
+| GET | `/api/docs?type=manuals\|team\|docs\|memory&bot=xxx&q=关键词` | 文档列表、成员筛选与白名单范围全文搜索 |
 | GET | `/api/docs/:id` | 返回单文档 markdown 原文 |
 | GET | `/health` | `{ ok: true, mock: boolean }` — 心跳卡靠这个测延迟 |
 
@@ -606,11 +607,11 @@ sudo journalctl -u darkhq-dashboard -f
 - [ ] §7.2 例牌运行历史回写（使用仓库自带的 `scripts/cron-wrapper.sh` 最省事）
 - [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
 - [x] §7.3 Signal 双读去重 + 归档口径修复（2026-05-05 v3.3.1）
-- [ ] §7.5 档案目录约定
-- [ ] §7.6 Gateway `/api/usage` 实现（当前 dashboard 显示"未对接"）
+- [x] §7.5 档案目录约定与分层展示
+- [x] §7.6 Token / 费用用量（改为 ZenMux management API，非 Gateway `/api/usage`）
 - [ ] §7.7 memory/ 目录整顿 + 累积型笔记迁移到 docs/
-- [ ] 卷宗支持全文搜索
-- [ ] 权限控制（现在完全裸奔）
+- [x] 卷宗支持白名单范围全文搜索（标题、分类、标签与正文）
+- [x] 可选权限控制（设置 `DASHBOARD_TOKEN` 后启用页面登录与 API 鉴权）
 - [ ] SQLite 存储替代 JSON 文件归档（数据量大后考虑）
 
 ---

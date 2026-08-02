@@ -41,6 +41,12 @@
         置顶手册与高频 SOP，不被普通系统文档或项目文档淹没。
       </div>
 
+      <div class="doc-search-bar">
+        <input type="search" id="doc-search" class="doc-search-input" placeholder="搜索标题和正文…" autocomplete="off">
+        <span id="doc-search-count" class="doc-search-count"></span>
+        <button class="btn ghost sm" id="doc-search-clear" style="display:none" onclick="clearSearch()">清除</button>
+      </div>
+
       <!-- bot 过滤，对档案和团队文件生效 -->
       <div class="filters" id="bot-filter-bar" style="display:none">
         <button class="filter-btn active" data-bot="all"       onclick="applyBotFilter('all',this)">全部兄弟</button>
@@ -82,6 +88,8 @@ let currentTab='manuals';
 let currentBot='all';
 let currentDocId=null;
 let currentPage=1;
+let searchQuery='';
+let searchTimer=null;
 const PAGE_SIZE=20;
 
 // ── Minimal markdown renderer（够用即可，不引外部库）──────
@@ -139,13 +147,18 @@ async function loadDocs(){
   filterBar.style.display = (currentTab==='manuals' || currentTab==='docs' || currentTab==='team') ? '' : 'none';
 
   try{
-    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}` + ((currentTab==='manuals' || currentTab==='docs' || currentTab==='team') && currentBot!=='all' ? `&bot=${currentBot}` : '');
+    const qs=`type=${currentTab}&page=${currentPage}&size=${PAGE_SIZE}`
+      + ((currentTab==='manuals' || currentTab==='docs' || currentTab==='team') && currentBot!=='all' ? `&bot=${currentBot}` : '')
+      + (searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : '');
     const data=await fetch(`/api/docs?${qs}`).then(r=>r.json());
     const docs=data.docs||[];
     const total=data.total||0;
     const totalPages=data.totalPages||1;
     if(!docs.length){
-      list.innerHTML='<div class="empty"><span class="empty-icon">📄</span>暂无卷宗</div>';
+      list.innerHTML=searchQuery
+        ? `<div class="empty"><span class="empty-icon">🔍</span>未找到含「${esc(searchQuery)}」的卷宗</div>`
+        : '<div class="empty"><span class="empty-icon">📄</span>暂无卷宗</div>';
+      updateSearchCount(0);
       renderPagination(0, 1, 1);
       return;
     }
@@ -156,8 +169,11 @@ async function loadDocs(){
           <span>${fmtTime(d.createdAt)}</span>
           <span>${fmtSize(d.size)}</span>
         </div>
+        ${d.searchSnippet?`<div class="doc-search-snippet">${highlightSearch(d.searchSnippet)}</div>`:''}
         ${(d.category||d.botId||(d.tags&&d.tags.length))?`<div class="doc-item-bot">${d.category?esc(d.category)+' · ':''}${d.tags&&d.tags.length?esc(d.tags.join(' · '))+' · ':''}${d.botId?(BOT_EMOJI[d.botId]||'●')+' '+esc(BOT_NAMES[d.botId]||d.botId):''}</div>`:''}
       </div>`).join('');
+
+    updateSearchCount(total);
 
     renderPagination(total, currentPage, totalPages);
 
@@ -169,6 +185,29 @@ async function loadDocs(){
     list.innerHTML=`<div class="empty"><span class="empty-icon">⚠</span>${esc(e.message)}</div>`;
     renderPagination(0, 1, 1);
   }
+}
+
+function highlightSearch(text){
+  const safe=esc(text);
+  if(!searchQuery)return safe;
+  const escaped=searchQuery.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return safe.replace(new RegExp(`(${escaped})`,'ig'),'<mark>$1</mark>');
+}
+
+function updateSearchCount(total){
+  const el=document.getElementById('doc-search-count');
+  if(el)el.textContent=searchQuery?`${total} 条结果`:'';
+}
+
+function clearSearch(){
+  searchQuery='';
+  currentPage=1;
+  currentDocId=null;
+  const input=document.getElementById('doc-search');
+  if(input)input.value='';
+  document.getElementById('doc-search-clear').style.display='none';
+  document.getElementById('doc-viewer').innerHTML='<div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>';
+  loadDocs();
 }
 
 function renderPagination(total, page, totalPages){
@@ -278,6 +317,19 @@ function applyBotFilter(bot,btn){
   btn.classList.add('active');
   loadDocs();
 }
+
+document.getElementById('doc-search').addEventListener('input',(event)=>{
+  clearTimeout(searchTimer);
+  const value=event.target.value.trim();
+  document.getElementById('doc-search-clear').style.display=value?'':'none';
+  searchTimer=setTimeout(()=>{
+    searchQuery=value;
+    currentPage=1;
+    currentDocId=null;
+    document.getElementById('doc-viewer').innerHTML='<div class="doc-viewer-empty">← 点左边嘅卷宗睇内容</div>';
+    loadDocs();
+  },250);
+});
 
 // URL 参数支持：/docs.html?bot=content → 默认切到整理文档并过滤该 bot
 (function bootstrap(){

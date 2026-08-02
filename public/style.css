@@ -650,6 +650,44 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 }
 
 /* ── Docs (会话日志 / 整理文档) ─────────────────────────── */
+.doc-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.doc-search-bar:focus-within { border-color: var(--accent-2); }
+.doc-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: 0.82rem var(--font-sans);
+}
+.doc-search-input::placeholder { color: var(--text-3); }
+.doc-search-count { color: var(--text-3); font: 0.7rem var(--font-mono); white-space: nowrap; }
+.doc-search-snippet {
+  margin-top: 0.45rem;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.doc-search-snippet mark {
+  padding: 0 0.1rem;
+  border-radius: 2px;
+  background: rgba(242, 185, 75, 0.22);
+  color: var(--warn);
+}
 .doc-layout {
   display: grid;
   grid-template-columns: 320px 1fr;

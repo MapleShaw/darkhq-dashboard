@@ -1,6 +1,6 @@
 {
   "name": "darkhq-dashboard",
-  "version": "3.3.4",
+  "version": "3.3.5",
   "description": "老巢 · OpenClaw 多 Bot 舰队控制台（香港黑帮主题）",
   "main": "server.js",
   "engines": {
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "NODE_ENV=production node server.js",
     "dev": "MOCK=1 node server.js",
-    "test": "node public/cron-title.test.js && node lib/task-runs.test.js && node scripts/darkhq-report.test.js && node routes/cron.test.js"
+    "test": "node public/cron-title.test.js && node lib/task-runs.test.js && node scripts/darkhq-report.test.js && node routes/cron.test.js && node routes/docs.test.js"
   },
   "keywords": [
     "openclaw",

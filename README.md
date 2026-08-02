@@ -19,9 +19,13 @@ NODE_ENV=production npm start
 |---|---|---|
 | `/` | **堂口** | 总览 —— KPI + 班底名册（头像 + 当前差事 + 最近一单）+ 日程预览 + 风声预览 + 线路心跳 + Token 用量 |
 | `/cron.html` | **日程** | 例牌任务列表 + 4 项状态统计，点击行展开看近 10 次出勤与输出 |
+| `/task-runs.html` | **任务流水** | 聚合各 Bot 回写的执行结果、证据、产物与阻塞 |
 | `/signals.html` | **风声** | 今日风声 + 旧账（近 7 天按日归档），可按源头筛选 |
-| `/docs.html` | **卷宗** | 档案（Bot 整理的文档）+ 聊天底（每日会话日志），可按兄弟筛选 |
-| `/settings.html` | **设置** | 班底身份、Token 用量、系统信息 |
+| `/docs.html` | **卷宗** | 核心手册、团队文件、成员档案、聊天记录与 Cron 产出，支持筛选和全文搜索 |
+| `/wewe.html` | **微读** | WeWeRSS 服务与账号状态 |
+| `/headroom.html` | **省流** | Headroom 用量与运行状态 |
+| `/status.html` | **健康** | Gateway、系统资源、服务和 Cron 健康概览 |
+| `/settings.html` | **设置** | 班底身份、Token / 费用用量、系统信息 |
 
 ## 术语速查（仅影响界面，代码字段保持英文）
 
@@ -50,3 +54,4 @@ NODE_ENV=production npm start
   - `data/cron-runs/{jobId}/*.json` — OpenClaw 跑完例牌可 POST 回写
 - **头像写死**：`public/avatars/bot-{id}.png`，不依赖用户上传
 - **Mock 开关**：`MOCK=1` 或非 production 自动启用，完整替换 API 返回
+- **访问控制**：设置 `DASHBOARD_TOKEN` 后启用登录页、HttpOnly 会话 Cookie 和 API 鉴权；未设置时为兼容旧部署而放行
