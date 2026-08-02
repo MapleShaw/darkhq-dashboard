@@ -55,3 +55,12 @@ NODE_ENV=production npm start
 - **头像写死**：`public/avatars/bot-{id}.png`，不依赖用户上传
 - **Mock 开关**：`MOCK=1` 或非 production 自动启用，完整替换 API 返回
 - **访问控制**：设置 `DASHBOARD_TOKEN` 后启用登录页、HttpOnly 会话 Cookie 和 API 鉴权；未设置时为兼容旧部署而放行
+
+### 任务流水数据来源
+
+`/api/task-runs` 聚合两类记录：
+
+- OpenClaw Cron 原生运行历史：自动读取当前作业及最近运行结果，页面无需等待任务主动回写。
+- DarkHQ 结构化回写：非 Cron 的 Bot 任务继续使用 `scripts/darkhq-report.js`，用于记录证据、产物、阻塞项和下一步。
+
+原生历史读取结果短时缓存；单个作业读取失败不会拖垮整个接口，接口会返回可用记录并在 `sources` / `warning` 中标记降级状态。
