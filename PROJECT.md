@@ -77,6 +77,7 @@
 |---|---|---|
 | 堂口 | `/` dashboard | 总览 |
 | 日程 / 例牌 | `/cron.html` cron | 定时任务 |
+| 任务流水 | `/task-runs.html` task runs | Cron 原生状态 + Bot 结构化回写 |
 | 风声 | `/signals.html` signal | 内容雷达信号 |
 | 卷宗 | `/docs.html` docs | 文档管理 |
 | ├ 档案 | `type=docs` | Bot 整理的正式文档 |
@@ -179,9 +180,10 @@ USE_MOCK = process.env.MOCK === '1'
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/bots` | 返回 5 个 bot 的元数据 + 运行时状态。⚠️ 线上运行时字段当前是占位，需 OpenClaw 填充（见 §7.1） |
-| GET | `/api/cron` | 返回 6 个例牌定义 + 最近一次状态。当 gateway 暴露 `/api/cron/jobs` 时会合并 |
-| GET | `/api/cron/:jobId/runs?limit=10` | 从 `data/cron-runs/{jobId}/` 读运行历史 |
+| GET | `/api/bots` | 返回 5 个 bot 的元数据，并从状态文件、结构化任务流水与 Cron state 合并最近任务状态（见 §7.1） |
+| GET | `/api/cron` | 从 OpenClaw Gateway 读取例牌定义与最近状态；不可用时返回明确降级标记 |
+| GET | `/api/cron/:jobId/runs?limit=10` | 从 `data/cron-runs/{jobId}/` 读 DarkHQ 本地回写历史 |
+| GET | `/api/task-runs?actor=&status=&limit=` | 聚合 OpenClaw Cron 原生最近状态与 DarkHQ 结构化回写，并返回双来源健康信息 |
 | GET | `/api/signals?source=all\|blog\|x\|podcast` | 读 `workspace/content-signal-radar/feed-*.json`，**同时归档一份到 `data/signals-archive/{today}.json`** |
 | GET | `/api/signals/history?days=7` | 从 `data/signals-archive/*.json` 读近 N 天 |
 | GET | `/api/usage` | ZenMux Token / 费用用量与趋势 |
@@ -203,72 +205,26 @@ USE_MOCK = process.env.MOCK === '1'
 
 按优先级排，**都不做 dashboard 也能跑**（会显示占位），做了就有真实数据。
 
-### 7.1 ⚠️ Bot 运行时状态
+### 7.1 Bot 运行时状态（已接入最近任务）
 
-当前 `/api/bots` 在线上只有元数据 + gateway 在线，**以下字段是空的**：
+`/api/bots` 已按时间择新合并三类事实源：
 
-- `status` — `online` / `running` / `offline`
-- `currentTask` — 正在执行的任务名（如 "正在整理《选题清单》"）
-- `lastTaskName` / `lastTaskTime` / `lastTaskStatus` — 最近一单
-- `weekTasks` — 本周任务数
+1. `data/bots-status.json`：OpenClaw 主动推送的兼容状态；
+2. `data/cron-runs/`：DarkHQ 结构化任务回写，提供中文标题、摘要与状态；
+3. OpenClaw Cron state：补齐各 Bot 最近一次例牌名称、时间与结果。
 
-**任选一种对接**：
+因此首页 Bot 卡已有可靠的「最近一单」。`currentTask` 目前仍固定为 `null`：在找到可信、不会把历史状态误判为运行中的事实源前，不凭日志猜测实时任务。
 
-**方案 A（推荐）：gateway 暴露 `/api/bots/status`**
+### 7.2 任务流水与例牌历史（原生接入 + 可选增强）
 
-```http
-GET http://localhost:18789/api/bots/status
-Authorization: Bearer {token}
+任务流水页 `/task-runs.html` 已聚合两类数据：
 
-Response:
-{
-  "bots": [
-    {
-      "id": "main",
-      "status": "online",
-      "currentTask": null,
-      "lastTaskName": "📊 每日简报",
-      "lastTaskTime": "2026-05-04T10:05:00Z",
-      "lastTaskStatus": "success",
-      "weekTasks": 18
-    },
-    ...
-  ]
-}
-```
+- **OpenClaw Cron 原生状态**：通过受支持的 CLI 读取当前作业最近状态，短时缓存；来源不可用或缓存过期时，API 和页面会明确显示降级状态。
+- **DarkHQ 结构化回写**：非 Cron Bot 任务使用 `scripts/darkhq-report.js` 写入证据、产物、阻塞项和下一步；每条记录会标为「结构化回写」。
 
-然后在 `server.js` 的 `/api/bots` 里合并这份数据即可（几行代码）。
+`POST /api/cron/:jobId/runs` 与 `scripts/cron-wrapper.sh` 继续兼容旧任务，但不再是查看 Cron 最近状态的前置条件。只有需要保留完整输出历史，或需要结构化证据/产物时，才建议主动回写。
 
-**方案 B：OpenClaw 主动推送**
-
-暴露 `POST /api/bots/status` 接口，OpenClaw 每次状态变化 POST 一次，dashboard 存到 `data/bots-status.json`。
-
-### 7.2 ⚠️ 例牌运行记录
-
-Dashboard 已经暴露 `POST /api/cron/:jobId/runs`，存到 `data/cron-runs/{jobId}/*.json`，在「日程 › 展开」里显示最近 10 次出勤。
-
-#### 推荐方式：用仓库自带的 wrapper 脚本
-
-`scripts/cron-wrapper.sh`（随代码仓库一起提交）帮你把"跑任务 + 量时长 + 抓输出 + 回写 dashboard"全部搞定。
-
-在 OpenClaw 的 crontab 里，**把原来直接写的命令改成 wrapper 包装一层**即可：
-
-```crontab
-# 之前：
-30 15 * * * node /home/openclaw/.openclaw/signal-radar.js
-
-# 之后：
-30 15 * * * /home/openclaw/darkhq-dashboard/scripts/cron-wrapper.sh signal-radar node /home/openclaw/.openclaw/signal-radar.js
-```
-
-Wrapper 会：
-- 记录开始时间 + 时长（毫秒）
-- 抓 stdout/stderr 作为 `output`（自动截断到 4KB，防止塞爆）
-- 根据退出码判断 `success` / `failed`
-- POST 回写到 dashboard，失败静默（不影响任务本身）
-- 最后用任务真实退出码退出（系统的 cron 报错邮件照常触发）
-
-#### 手工方式（不想用 wrapper 时）
+手工兼容回写示例：
 
 ```bash
 curl -X POST http://localhost:9700/api/cron/signal-radar/runs \
@@ -281,13 +237,7 @@ curl -X POST http://localhost:9700/api/cron/signal-radar/runs \
   }'
 ```
 
-**字段约定**（POST body）：
-- `status`: `"success"` / `"failed"` / `"running"`（必填）
-- `output`: 任务的原始输出，建议保留原样，dashboard 会用等宽字体展示（必填，可空字符串）
-- `startedAt`: ISO 8601 时间戳（可选，不填用服务器当前时间）
-- `durationMs`: 毫秒数（可选）
-
-**这是最小对接，强烈建议做**。做完后所有例牌会从"未知"变为"搞掂/失手"，展开能看到真实的运行历史。
+状态仍使用 `success` / `failed` / `running`；旧别名会由服务端规范化。
 
 ### 7.3 ✅ Signal Radar（已对接，2026-05 升级）
 
@@ -603,8 +553,8 @@ sudo journalctl -u darkhq-dashboard -f
 
 ## 10. 待办
 
-- [ ] §7.1 Bot 运行时状态对接
-- [ ] §7.2 例牌运行历史回写（使用仓库自带的 `scripts/cron-wrapper.sh` 最省事）
+- [x] §7.1 Bot 最近任务状态对接（状态文件 + 结构化流水 + Cron state）；实时 `currentTask` 待可靠事实源
+- [x] §7.2 Cron 原生最近状态接入任务流水；结构化回写保留为可选增强
 - [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
 - [x] §7.3 Signal 双读去重 + 归档口径修复（2026-05-05 v3.3.1）
 - [x] §7.5 档案目录约定与分层展示

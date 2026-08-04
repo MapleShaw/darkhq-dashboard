@@ -27,7 +27,7 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">任务流水</h2>
-          <p class="page-desc">所有 Bot 动态任务回写；独立于定时任务 / cron 例牌。</p>
+          <p class="page-desc">聚合 OpenClaw Cron 原生状态与 Bot 结构化回写，统一查看执行结果。</p>
         </div>
         <button class="btn ghost sm" onclick="loadTaskRuns()">↻ 更新</button>
       </div>
@@ -36,11 +36,17 @@
         <div class="stat"><div class="stat-label">总流水</div><div class="stat-value" id="task-total">—</div><div class="stat-sub">当前筛选</div></div>
         <div class="stat"><div class="stat-label">搞掂</div><div class="stat-value" id="task-success">—</div><div class="stat-sub ok">真实 success</div></div>
         <div class="stat"><div class="stat-label">待跟进</div><div class="stat-value" id="task-warn">—</div><div class="stat-sub">确认 / 开工中</div></div>
-        <div class="stat"><div class="stat-label">跳过坏档</div><div class="stat-value" id="task-skipped">—</div><div class="stat-sub err">容错计数</div></div>
+        <div class="stat"><div class="stat-label">数据告警</div><div class="stat-value" id="task-skipped">—</div><div class="stat-sub err">坏档 / 来源降级</div></div>
+      </section>
+
+      <section class="card task-source-card" aria-labelledby="task-source-title">
+        <div class="card-title" id="task-source-title">数据来源 <span class="meta">实时健康与降级状态</span></div>
+        <div class="task-source-grid" id="task-source-grid"><div class="loading">检查中…</div></div>
+        <div class="task-source-warning" id="task-source-warning" hidden></div>
       </section>
 
       <section class="card">
-        <div class="card-title">动态任务 <span class="meta">Bot 主动回写 · 非 cron 例牌</span></div>
+        <div class="card-title">执行记录 <span class="meta">Cron 原生状态 + Bot 结构化回写</span></div>
         <div class="task-run-toolbar">
           <label>执行者
             <select class="input" id="task-run-actor">

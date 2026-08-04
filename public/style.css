@@ -1430,6 +1430,27 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 }
 
 /* ── Dynamic Task Runs ─────────────────────────────────── */
+.task-source-card { margin-bottom: 1rem; }
+.task-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.task-source-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem .75rem;
+  padding: .75rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg-1);
+}
+.task-source-item strong { display: block; font-size: .82rem; }
+.task-source-item > div > span { display: block; margin-top: .15rem; color: var(--text-3); font-size: .7rem; }
+.task-source-item small { grid-column: 1 / -1; color: var(--text-3); font-size: .68rem; }
+.task-source-metrics { display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.task-source-metrics b { font: 500 .76rem var(--font-mono); color: var(--text-2); }
+.task-source-warning {
+  margin-top: .7rem; padding: .6rem .7rem; border: 1px solid rgba(242,185,75,.28);
+  border-radius: var(--r-sm); background: rgba(242,185,75,.07); color: var(--warn); font-size: .72rem;
+}
+.source-badge {
+  display: inline-flex; align-items: center; padding: .14rem .42rem; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--text-3); font-size: .62rem; font-weight: 500; white-space: nowrap;
+}
+.source-badge.native { border-color: rgba(74,144,226,.28); color: #78aef0; }
+.source-badge.writeback { border-color: rgba(45,212,138,.26); color: var(--ok); }
 .task-run-toolbar {
   display: flex; gap: 0.75rem; flex-wrap: wrap;
   margin-bottom: 0.8rem;
@@ -1461,7 +1482,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 }
 .task-run-row summary::-webkit-details-marker { display: none; }
 .task-run-row[open] summary { background: rgba(255,255,255,0.02); }
-.task-run-actor { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.task-run-actor { display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex-wrap: wrap; }
 .task-run-actor .actor-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
 .task-run-main { min-width: 0; }
 .task-run-title {
@@ -1491,6 +1512,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   word-break: break-word;
 }
 @media (max-width: 760px) {
+  .task-source-grid { grid-template-columns: 1fr; }
   .cron-head { display: none; }
   .cron-row { grid-template-columns: 1fr 88px; gap: 0.45rem; }
   .cron-model { grid-column: 1 / -1; }

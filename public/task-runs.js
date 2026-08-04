@@ -20,6 +20,10 @@
     darkhq_task_flow: 'DarkHQ 任务流水修复',
     readonly_audit: '幽灵任务审计',
   };
+  const SOURCE_LABELS = {
+    'openclaw-cron': ['Cron 原生', 'native'],
+    'darkhq-writeback': ['结构化回写', 'writeback'],
+  };
 
   function $(id) { return document.getElementById(id); }
   function esc(value) {
@@ -74,6 +78,10 @@
     return { success: 'var(--ok)', failed: 'var(--err)', needs_confirmation: 'var(--warn)', running: 'var(--warn)' }[normalizeStatus(status)] || 'var(--text-3)';
   }
   function actorLabel(actor) { return ACTORS[actor] || actor || '—'; }
+  function sourceBadge(source) {
+    const pair = SOURCE_LABELS[source] || [source || '未知来源', 'unknown'];
+    return `<span class="source-badge ${attr(pair[1])}">${esc(pair[0])}</span>`;
+  }
   function taskTypeLabel(taskType) {
     const raw = String(taskType || '').trim();
     return TASK_TYPE_LABELS[raw] || '';
@@ -124,13 +132,34 @@
     if ($('task-warn')) $('task-warn').textContent = c.needs_confirmation + c.running;
     if ($('task-skipped')) $('task-skipped').textContent = skipped || 0;
   }
+  function sourceState(source) {
+    if (!source || source.available === false) return ['err', '不可用'];
+    if (source.stale) return ['warn', '数据过期'];
+    if (source.cached) return ['dim', '缓存'];
+    return ['ok', '实时'];
+  }
+  function renderSourceHealth(sources, warning) {
+    const grid = $('task-source-grid');
+    const warningEl = $('task-source-warning');
+    if (!grid || !warningEl) return;
+    const writeback = (sources && sources.writeback) || {};
+    const cron = (sources && sources.openclawCron) || {};
+    const cronState = sourceState(cron);
+    const writebackState = Number(writeback.errors || 0) > 0 ? ['warn', '有坏档'] : ['ok', '正常'];
+    grid.innerHTML = [
+      `<div class="task-source-item"><div><strong>OpenClaw Cron</strong><span>原生作业最近状态</span></div><div class="task-source-metrics"><b>${esc(Number(cron.runs || 0))} 条</b><span class="badge ${cronState[0]}">${cronState[1]}</span></div><small>${esc(Number(cron.jobs || 0))} 个作业${cron.cached ? ' · 已缓存' : ''}</small></div>`,
+      `<div class="task-source-item"><div><strong>DarkHQ 回写</strong><span>Bot 证据、产物与阻塞</span></div><div class="task-source-metrics"><b>${esc(Number(writeback.runs || 0))} 条</b><span class="badge ${writebackState[0]}">${writebackState[1]}</span></div><small>${esc(Number(writeback.errors || 0))} 个坏档</small></div>`,
+    ].join('');
+    warningEl.hidden = !warning;
+    warningEl.textContent = warning || '';
+  }
   function renderRun(r, i) {
     const id = attr(`task-run-${i}`);
     const title = displayTitle(r);
     const summary = displaySummary(r);
     return `<details class="task-run-row" id="${id}">
       <summary title="${attr(summary)}">
-        <div class="task-run-actor"><span class="actor-dot" style="background:${dotColor(r.status)}"></span><span>${esc(actorLabel(r.actor))}</span></div>
+        <div class="task-run-actor"><span class="actor-dot" style="background:${dotColor(r.status)}"></span><span>${esc(actorLabel(r.actor))}</span>${sourceBadge(r.source)}</div>
         <div>${statusBadge(r.status)}</div>
         <div class="task-run-main"><div class="task-run-title">${esc(title)}</div><div class="task-run-summary">${esc(summary)}</div></div>
         <div class="cron-time">${fmtTime(r.startedAt)}</div>
@@ -139,6 +168,7 @@
         <div class="detail-field"><label>任务 ID</label><code>${esc(text(r.taskId))}</code></div>
         <div class="detail-field internal-field"><label>流水 ID / 内部类型</label><code>${esc(text(r.jobId))} · ${esc(text(r.taskType))}</code></div>
         <div class="detail-field"><label>执行者</label><span>${esc(actorLabel(r.actor))} · ${esc(text(r.actor))}</span></div>
+        <div class="detail-field"><label>数据来源</label><span>${sourceBadge(r.source)}</span></div>
         <div class="detail-field"><label>状态</label><span>${statusBadge(r.status)}</span></div>
         ${r.resolvedAt ? `<div class="detail-field"><label>关闭时间</label><span>${esc(text(r.resolvedAt))}</span></div>` : ''}
         ${r.resolutionSummary ? `<div class="detail-field" style="grid-column:1/-1"><label>关闭说明</label><span>${esc(r.resolutionSummary)}</span></div>` : ''}
@@ -183,13 +213,15 @@
       if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
       const runs = Array.isArray(data.runs) ? data.runs : [];
       paintStats(runs, Number(data.skipped || data.errors || 0));
+      renderSourceHealth(data.sources, data.warning);
       if (!runs.length) {
         list.innerHTML = '<div class="empty"><span class="empty-icon">📋</span>暂无任务流水</div>';
         return;
       }
       list.innerHTML = `<div class="task-run-head"><div>执行者 / 类型</div><div>状态</div><div>摘要</div><div>时间</div></div>${runs.map(renderRun).join('')}`;
     } catch (err) {
-      paintStats([], 0);
+      paintStats([], 1);
+      renderSourceHealth(null, `任务流水接口不可用：${err.message || err}`);
       list.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${esc(err.message || err)}</div>`;
     }
   }
