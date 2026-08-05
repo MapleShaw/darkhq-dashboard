@@ -132,6 +132,15 @@ async function loadBots() {
   grid.innerHTML = '<div class="loading">载入中…</div>';
   try {
     const data = await fetch('/api/bots').then((r) => r.json());
+    // First request may intentionally return before the slower OpenClaw task
+    // snapshot is warm. Refresh once after the background lookup completes.
+    if (data.currentTasks?.refreshing && !window.__botTaskRefreshPending) {
+      window.__botTaskRefreshPending = true;
+      setTimeout(() => {
+        window.__botTaskRefreshPending = false;
+        loadBots();
+      }, 12 * 1000);
+    }
     updateGatewayPill(data.gatewayOnline);
     setText('bot-count', `${(data.bots || []).length} 位兄弟`);
 
@@ -160,10 +169,15 @@ function renderBotCard(bot) {
     ? `<img src="${esc(bot.avatarUrl)}" alt="${esc(bot.name)}" onerror="this.style.display='none'">`
     : '🤖';
 
+  const currentTaskKey = bot.currentTaskStatus === 'queued' ? '排队中' : '正在开工';
+  const currentTaskIcon = bot.currentTaskStatus === 'queued' ? '◷' : '⟳';
+  const currentTaskTime = bot.currentTaskStartedAt
+    ? ` <span class="mono">· ${fmtAgo(bot.currentTaskStartedAt)}</span>`
+    : '';
   const nowTaskLine = bot.currentTask
     ? `<div class="bot-card-meta-row">
-         <span class="key">正在开工</span>
-         <span class="val"><span class="emoji">⟳</span>${esc(bot.currentTask)}</span>
+         <span class="key">${currentTaskKey}</span>
+         <span class="val"><span class="emoji">${currentTaskIcon}</span>${esc(bot.currentTask)}${currentTaskTime}</span>
        </div>`
     : `<div class="bot-card-meta-row">
          <span class="key">目前</span>

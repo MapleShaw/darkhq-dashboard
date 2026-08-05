@@ -55,6 +55,7 @@ NODE_ENV=production npm start
 - **头像写死**：`public/avatars/bot-{id}.png`，不依赖用户上传
 - **Mock 开关**：`MOCK=1` 或非 production 自动启用，完整替换 API 返回
 - **访问控制**：设置 `DASHBOARD_TOKEN` 后启用登录页、HttpOnly 会话 Cookie 和 API 鉴权；未设置时为兼容旧部署而放行
+- **实时任务事实源**：堂口 Bot 卡通过 OpenClaw Task ledger 的 `queued / running` 状态展示当前任务，并用 Cron `runningAtMs` 补漏；普通活跃会话不会被误报为正在执行任务
 
 ### 任务流水数据来源
 
@@ -64,3 +65,5 @@ NODE_ENV=production npm start
 - DarkHQ 结构化回写：非 Cron 的 Bot 任务继续使用 `scripts/darkhq-report.js`，用于记录证据、产物、阻塞项和下一步。
 
 原生状态读取结果短时缓存；读取失败不会拖垮整个接口，接口会返回仍可用的结构化记录，并在 `sources` / `warning` 中标记缓存、过期或不可用。任务流水页顶部展示两类来源的条数和健康状态，每条记录也带来源标签。
+
+堂口的当前任务另由 `/api/bots` 实时读取 OpenClaw Task ledger，并用 Cron 运行态补漏。读取在后台执行，带 12 秒进程硬超时、30 秒缓存和并发去重；来源异常时只降级为不显示当前任务，不影响 Bot 卡及其他数据返回。

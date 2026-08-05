@@ -12,6 +12,7 @@ const os      = require('os');
 const fetch   = require('node-fetch');
 const router  = express.Router();
 const { normalizeStatus, readTaskRuns } = require('../lib/task-runs');
+const { readCurrentTasks } = require('../lib/openclaw-current-tasks');
 
 const {
   OPENCLAW_ROOT,
@@ -36,6 +37,9 @@ router.get('/api/bots', async (req, res) => {
     { id: 'assistant', name: '跟班',       codename: 'assistant', model: 'Ling 2.6 1T',        role: '杂活',     channel: 'telegram' },
   ];
 
+  // Task discovery is stale-while-revalidate: this read returns immediately
+  // while a bounded background refresh updates the shared snapshot.
+  const currentTasksData = readCurrentTasks();
   const gatewayOnline = await gatewayHealth();
 
   // 从最近日志推断 lastSeen
@@ -129,12 +133,16 @@ router.get('/api/bots', async (req, res) => {
   const result = bots.map((b) => {
     const rt = runtimeMap[b.id] || {};
     const tk = tokenMap[b.id] || {};
+    const current = currentTasksData.tasks[b.id] || null;
     return {
       ...b,
       avatarUrl: `/avatars/bot-${b.id}.png`,
       online: gatewayOnline,
-      status: rt.status || (gatewayOnline ? 'online' : 'offline'),
-      currentTask: null,
+      status: current?.status === 'running' ? 'running' : (rt.status || (gatewayOnline ? 'online' : 'offline')),
+      currentTask: current?.title || null,
+      currentTaskStatus: current?.status || null,
+      currentTaskStartedAt: current?.startedAt || null,
+      currentTaskSource: current?.source || null,
       lastTaskName: rt.lastTaskName || null,
       lastTaskTitle: rt.lastTaskTitle || rt.lastTaskName || null,
       lastTaskSummary: rt.lastTaskSummary || null,
@@ -157,7 +165,20 @@ router.get('/api/bots', async (req, res) => {
     if (h > 0) return `${h}小时 ${m}分钟`;
     return `${m}分钟`;
   })();
-  res.json({ ok: true, bots: result, gatewayOnline, host: os.hostname(), uptime: uptimeStr });
+  res.json({
+    ok: true,
+    bots: result,
+    gatewayOnline,
+    host: os.hostname(),
+    uptime: uptimeStr,
+    currentTasks: {
+      sources: currentTasksData.sources,
+      cached: Boolean(currentTasksData.cached),
+      stale: Boolean(currentTasksData.stale),
+      warnings: currentTasksData.warnings,
+      refreshing: Boolean(currentTasksData.refreshing),
+    },
+  });
 });
 
 // ─── POST /api/bots/status ────────────────────────────────

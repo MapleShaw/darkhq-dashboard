@@ -213,7 +213,7 @@ USE_MOCK = process.env.MOCK === '1'
 2. `data/cron-runs/`：DarkHQ 结构化任务回写，提供中文标题、摘要与状态；
 3. OpenClaw Cron state：补齐各 Bot 最近一次例牌名称、时间与结果。
 
-因此首页 Bot 卡已有可靠的「最近一单」。`currentTask` 目前仍固定为 `null`：在找到可信、不会把历史状态误判为运行中的事实源前，不凭日志猜测实时任务。
+因此首页 Bot 卡已有可靠的「最近一单」。`currentTask` 现以 OpenClaw Task ledger 的 `queued / running` 为主事实源，并用 Cron `state.runningAtMs` 补漏；普通会话活跃不视为正在执行任务。读取采用后台刷新、30 秒缓存、并发去重和 12 秒进程硬超时，来源异常时仅降级为空，不阻塞 `/api/bots`。
 
 ### 7.2 任务流水与例牌历史（原生接入 + 可选增强）
 
@@ -553,7 +553,7 @@ sudo journalctl -u darkhq-dashboard -f
 
 ## 10. 待办
 
-- [x] §7.1 Bot 最近任务状态对接（状态文件 + 结构化流水 + Cron state）；实时 `currentTask` 待可靠事实源
+- [x] §7.1 Bot 最近任务状态与实时 `currentTask` 对接（Task ledger 主源 + Cron 运行态补漏）
 - [x] §7.2 Cron 原生最近状态接入任务流水；结构化回写保留为可选增强
 - [x] §7.3 Signal Radar 数据源升级（2026-05-05：prepare-digest.js 写出 dashboard-signals.json）
 - [x] §7.3 Signal 双读去重 + 归档口径修复（2026-05-05 v3.3.1）
