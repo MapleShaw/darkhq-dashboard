@@ -13,6 +13,7 @@ const fetch   = require('node-fetch');
 const router  = express.Router();
 const { normalizeStatus, readTaskRuns } = require('../lib/task-runs');
 const { readCurrentTasks } = require('../lib/openclaw-current-tasks');
+const { readLiveCronRuns } = require('../lib/openclaw-task-runs');
 
 const {
   OPENCLAW_ROOT,
@@ -76,43 +77,31 @@ router.get('/api/bots', async (req, res) => {
     }
   } catch (e) { /* no task archive: keep legacy runtime */ }
 
-  // 从 Gateway cron 文件直接读取各 bot 的最后任务时间
+  // Gateway 迁移后 cron 状态不再落在旧的本地 JSON 文件；用受支持的
+  // OpenClaw CLI 读取实时状态。它与任务时间线共用同一 60 秒缓存。
   try {
-    const path = require('path');
-    const CRON_DIR      = require('path').join(OPENCLAW_ROOT, 'cron');
-    const cronJobsDef   = safeReadJson(path.join(CRON_DIR, 'jobs.json'), {});
-    const cronJobsState = safeReadJson(path.join(CRON_DIR, 'jobs-state.json'), {});
-    const jobsDef  = Array.isArray(cronJobsDef) ? cronJobsDef : (cronJobsDef.jobs ? Object.entries(cronJobsDef.jobs).map(([id, v]) => ({ id, ...v })) : []);
-    const stateMap = cronJobsState.jobs || {};
-
-    const botJobMap = {};
-    jobsDef.forEach((job) => {
-      const aid = job.agentId;
-      if (!aid) return;
-      const st = stateMap[job.id] || {};
-      const stateObj = st.state || job.state || {};
-      const lastRunAtMs = stateObj.lastRunAtMs;
-      if (!lastRunAtMs) return;
-      if (!botJobMap[aid] || lastRunAtMs > botJobMap[aid].lastRunAtMs) {
-        botJobMap[aid] = {
-          lastRunAtMs,
-          name: (job.name || '').replace(/^[\p{Emoji}\u200d\ufe0f\s]+/u, '').trim().slice(0, 30),
-          status: normalizeStatus(stateObj.lastRunStatus),
-        };
-      }
-    });
-
-    Object.entries(botJobMap).forEach(([aid, info]) => {
-      if (!runtimeMap[aid]) runtimeMap[aid] = {};
-      const existingTime = runtimeMap[aid].lastTaskTime ? new Date(runtimeMap[aid].lastTaskTime).getTime() : 0;
-      if (info.lastRunAtMs > existingTime) {
-        runtimeMap[aid].lastTaskName   = info.name || runtimeMap[aid].lastTaskName || null;
-        runtimeMap[aid].lastTaskTime   = new Date(info.lastRunAtMs).toISOString();
-        runtimeMap[aid].lastTaskStatus = info.status;
-        if (!runtimeMap[aid].lastSeen) runtimeMap[aid].lastSeen = new Date(info.lastRunAtMs).toISOString();
-      }
-    });
-  } catch (e) { /* cron 文件读取失败不影响主流程 */ }
+    const live = await readLiveCronRuns();
+    for (const run of live.runs) {
+      if (!run.actor) continue;
+      // Never label the scheduler's start timestamp as “收工”.
+      if (!run.completionKnown || !run.finishedAt) continue;
+      const finishedAt = run.finishedAt;
+      const finishedMs = Date.parse(finishedAt) || 0;
+      const current = runtimeMap[run.actor] || {};
+      const currentMs = Date.parse(current.lastTaskTime || '') || 0;
+      if (finishedMs < currentMs) continue;
+      runtimeMap[run.actor] = {
+        ...current,
+        lastTaskName: run.title || current.lastTaskName || null,
+        lastTaskTitle: run.title || current.lastTaskTitle || null,
+        lastTaskSummary: run.summary || current.lastTaskSummary || null,
+        lastTaskType: run.taskType || current.lastTaskType || null,
+        lastTaskTime: finishedAt,
+        lastTaskStatus: run.status || current.lastTaskStatus || null,
+      };
+      if (!runtimeMap[run.actor].lastSeen) runtimeMap[run.actor].lastSeen = finishedAt;
+    }
+  } catch (e) { /* live cron unavailable: retain task archive / legacy state */ }
 
   // 顺手拉一次 usage，把 per-bot 的 todayTokens 合并到每张卡
   const tokenMap = {};

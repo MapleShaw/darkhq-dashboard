@@ -640,6 +640,22 @@ function copyReceipt() {
   });
 }
 
+// ── 公网 TLS 证书 ───────────────────────────────────
+async function loadCertificate() {
+  const el = document.getElementById('sys-certificate');
+  if (!el) return;
+  try {
+    const data = await fetch('/api/certificate').then((r) => r.json());
+    if (!data.ok) throw new Error(data.error || '读取失败');
+    const cert = data.certificate;
+    el.textContent = new Date(cert.expiresAt).toLocaleDateString('sv-SE');
+    el.title = `公网证书 · ${cert.host} · 最近检查：${new Date(cert.checkedAt).toLocaleString()}`;
+  } catch (e) {
+    el.textContent = '获取失败';
+    el.title = e.message;
+  }
+}
+
 // ── 统一刷新 ──────────────────────────────────────
 function loadAll() {
   loadBots();
@@ -647,6 +663,7 @@ function loadAll() {
   loadCronPreview();
   loadSignalPreview();
   loadTokenMini();
+  loadCertificate();
   pollHeartbeat();
 }
 

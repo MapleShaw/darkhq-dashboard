@@ -135,6 +135,7 @@ app.use(require('./routes/sources'));
 app.use(require('./routes/wewe'));
 app.use(require('./routes/headroom'));
 app.use(require('./routes/status'));
+app.use(require('./routes/certificate'));
 app.use(require('./routes/usage'));
 app.use(require('./routes/docs'));
 app.use(require('./routes/settings'));

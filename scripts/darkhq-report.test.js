@@ -21,8 +21,8 @@ function sample(overrides = {}) {
     title: '幽灵任务审计',
     status: 'success',
     summary: '幽灵任务审计完成并留档',
-    evidence: ['docs/main/audits/ghost-tasks-2026-07-18.md'],
-    artifacts: ['docs/main/audits/ghost-tasks-2026-07-18.result.json'],
+    evidence: ['docs/main/audits/archive/ghost-tasks-2026-07-18.md'],
+    artifacts: ['docs/main/audits/archive/ghost-tasks-2026-07-18.result.json'],
     blockers: [],
     nextAction: 'handoff_tech',
     startedAt: '2026-07-18T09:00:00.000+08:00',
@@ -61,7 +61,7 @@ async function testValidMapping() {
   const output = JSON.parse(payload.output);
   assert.strictEqual(output.actor, 'assistant');
   assert.strictEqual(output.title, '幽灵任务审计');
-  assert.deepStrictEqual(output.evidence, ['docs/main/audits/ghost-tasks-2026-07-18.md']);
+  assert.deepStrictEqual(output.evidence, ['docs/main/audits/archive/ghost-tasks-2026-07-18.md']);
 }
 
 async function testInvalidActorStatus() {

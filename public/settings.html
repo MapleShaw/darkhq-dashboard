@@ -110,7 +110,7 @@
             <div class="info-list">
               <div class="info-item"><span class="label">版本</span><span class="value">v3.2</span></div>
               <div class="info-item"><span class="label">域名</span><span class="value"><a href="https://darkhq.indiehacker.fun" target="_blank">darkhq.indiehacker.fun</a></span></div>
-              <div class="info-item"><span class="label">证书到期</span><span class="value">2026-07-31</span></div>
+              <div class="info-item"><span class="label">证书到期</span><span class="value" id="sys-certificate">读取中…</span></div>
               <div class="info-item"><span class="label">线路</span><span class="value" id="gw-status-txt">—</span></div>
             </div>
           </section>
@@ -374,7 +374,17 @@ async function loadUsage(){
   }
 }
 
-document.addEventListener('DOMContentLoaded',()=>{loadBots();loadUsage();});
+async function loadCertificate(){
+  const el=document.getElementById('sys-certificate');
+  if(!el)return;
+  try{
+    const data=await fetch('/api/certificate').then(r=>r.json());
+    if(!data.ok)throw new Error(data.error||'读取失败');
+    el.textContent=new Date(data.certificate.expiresAt).toLocaleDateString('sv-SE');
+    el.title=`公网证书 · ${data.certificate.host} · 最近检查：${new Date(data.certificate.checkedAt).toLocaleString()}`;
+  }catch(e){el.textContent='获取失败';el.title=e.message;}
+}
+document.addEventListener('DOMContentLoaded',()=>{loadBots();loadUsage();loadCertificate();});
 </script>
 </body>
 </html>

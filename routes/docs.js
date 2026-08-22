@@ -29,30 +29,42 @@ const CRON_DOC_DEFS = [
 const JOB_IDS = ['daily-english', 'soul-check', 'daily-brief', 'signal-radar', 'update-check', 'daily-log'];
 
 // 卷宗采用“白名单”而不是扫描整个工作区：
-// - 团队文件：跨 Agent 的系统关键文件 + 项目总账中标为 Paused 的项目摘要
-// - 档案：各 Agent 的个人设定、专属资料与产出记录
-// memory/ 始终只属于“聊天记录”，不会从这里穿透展示。
+// - 核心手册：团队必须遵循的规则、共享事实、项目治理与执行协议
+// - 团队文件：持续使用的项目入口、产品素材与运行知识
+// - 档案：成员专属资料与未纳入白名单的成员文档
+// - 聊天记录：memory 日志与明确归档的历史材料
 const VIEWABLE_MAX_SIZE = 2 * 1024 * 1024;
 const SEARCH_QUERY_MAX_LENGTH = 120;
-const CORE_TEAM_FILES = [
-  { botId: 'main', rel: 'docs/main/project-registry.md', title: '项目总账 · Project Registry', category: '项目治理' },
-  { botId: 'main', rel: 'AGENTS.md', title: 'OpenClaw 团队协作规则', category: '系统关键' },
-  { botId: 'tech', sourceBotId: 'main', rel: 'darkhq-dashboard/PROJECT.md', title: '老巢控制台 · 项目说明', category: '关键项目 · tech维护', tags: ['tech', 'canonical:main'] },
-  { botId: 'main', rel: 'content-signal-radar/README.md', title: 'Content Signal Radar · 系统说明', category: '关键项目' },
-  { botId: 'main', rel: 'content-signal-radar/TODO.md', title: 'Content Signal Radar · 待办', category: '关键项目' },
-  { botId: 'tech', rel: 'docs/tech/运维知识-darkhq-wewerss.md', title: 'OpenClaw 运维知识 · DarkHQ / WeWeRSS', category: '系统关键' },
-];
 const CORE_MANUAL_FILES = [
-  {
-    botId: 'main',
-    rel: 'docs/main/ai-image-video-399-1v1-sop-v0.1.md',
-    title: '核心手册 · AI 图片/视频 399 元 1V1 SOP',
-    category: '核心手册',
-    tags: ['置顶', '客户交付', '1V1'],
-    pinned: true,
-  },
+  { botId: 'main', rel: 'AGENTS.md', title: '核心手册 · OpenClaw 团队协作规则', category: '协作规则', tags: ['置顶', 'canonical'], pinned: true },
+  { botId: 'main', rel: 'docs/shared/team-context.md', title: '核心手册 · 团队共享事实', category: '共享事实', tags: ['置顶', 'canonical'], pinned: true },
+  { botId: 'main', rel: 'docs/main/project-registry.md', title: '核心手册 · 项目总账', category: '项目治理', tags: ['置顶', 'canonical'], pinned: true },
+  { botId: 'main', rel: 'docs/main/team-node-status.md', title: '核心手册 · 团队节点状态', category: '节点协作', tags: ['canonical'], pinned: false },
+  { botId: 'main', rel: 'docs/main/assistant-execution-node-plan.md', title: '核心手册 · 执行节点协议', category: '执行协议', tags: ['assistant', 'tech'], pinned: false },
+  { botId: 'main', rel: 'docs/main/ai-image-video-399-1v1-sop-v0.1.md', title: '核心手册 · AI 图片/视频 399 元 1V1 SOP', category: '业务 SOP', tags: ['草稿', '1V1'], pinned: false },
 ];
-const CURATED_FILE_DEFS = [...CORE_TEAM_FILES, ...CORE_MANUAL_FILES];
+
+const CORE_TEAM_FILES = [
+  { botId: 'tech', sourceBotId: 'main', rel: 'darkhq-dashboard/PROJECT.md', title: '老巢控制台 · 项目说明', category: '关键项目 · tech维护', tags: ['tech', 'canonical:main'] },
+  { botId: 'intel', sourceBotId: 'main', rel: 'content-signal-radar/README.md', title: 'Content Signal Radar · 系统说明', category: '关键项目 · 线人维护', tags: ['intel', 'canonical:main'] },
+  { botId: 'intel', sourceBotId: 'main', rel: 'content-signal-radar/TODO.md', title: 'Content Signal Radar · 待办', category: '关键项目 · 线人维护', tags: ['intel', 'canonical:main'] },
+  { botId: 'tech', rel: 'docs/tech/运维知识-darkhq-wewerss.md', title: 'OpenClaw 运维知识 · DarkHQ / WeWeRSS', category: '系统关键' },
+  { botId: 'main', rel: 'docs/main/prompt-collection-v1.md', title: 'Prompt 合集 · 项目索引', category: '关键项目 · main维护', tags: ['prompt-collection'] },
+  { botId: 'main', rel: 'docs/prompt-collection/flowus-product-page.md', title: 'Prompt 合集 · 商品页文案', category: '产品素材', tags: ['prompt-collection', '草稿'] },
+  { botId: 'main', rel: 'docs/prompt-collection/launch-tweets.md', title: 'Prompt 合集 · X 引流文案', category: '产品素材', tags: ['prompt-collection', '草稿'] },
+  { botId: 'main', rel: 'docs/goose-retirement-blueprint/README.md', title: '鹅厂退休蓝图 · 长期策略入口', category: '长期策略', tags: ['goose-retirement-blueprint'] },
+  { botId: 'main', rel: 'memory/projects/副业-个人品牌.md', title: '个人品牌 · 当前商业主线', category: '关键项目 · main维护', tags: ['brand', 'canonical:main'] },
+  { botId: 'main', rel: 'memory/projects/content-signal-radar.md', title: 'Content Signal Radar · 项目档案', category: '关键项目 · intel维护', tags: ['intel', 'signal-radar'] },
+  { botId: 'main', rel: 'memory/projects/video2seedance.md', title: 'Video2Seedance · 历史技术档案', category: '暂停项目 · 技术档案', tags: ['paused'] },
+];
+
+const HISTORICAL_RECORD_FILES = [
+  { botId: 'main', rel: 'docs/main/audits/archive/ghost-tasks-2026-07-18.md', title: '历史记录 · 幽灵任务审计', category: '历史审计' },
+  { botId: 'main', rel: 'docs/main/audits/archive/ghost-tasks-2026-07-18.result.json', title: '历史记录 · 幽灵任务审计结果', category: '历史审计' },
+  { botId: 'main', rel: 'docs/main/audits/archive/shared-context-baseline-v1.md', title: '历史记录 · 共享上下文旧基线', category: '历史基线' },
+  { botId: 'main', rel: 'docs/main/audits/archive/youmind-correction-2026-07-18.json', title: '历史记录 · YouMind 纠正包', category: '历史纠正' },
+];
+const CURATED_FILE_DEFS = [...CORE_TEAM_FILES, ...CORE_MANUAL_FILES, ...HISTORICAL_RECORD_FILES];
 const PERSONAL_ARCHIVE_NAMES = ['SOUL.md', 'IDENTITY.md', 'TOOLS.md', 'TODO.md'];
 
 function workspaceFor(botId) {
@@ -61,7 +73,7 @@ function workspaceFor(botId) {
 
 function makeFileEntry({ botId, sourceBotId = botId, rel, title, category, type = 'team', tags = [], pinned = false }) {
   const root = workspaceFor(sourceBotId);
-  if (!root || rel.split('/').includes('memory')) return null;
+  if (!root) return null;
   const full = path.resolve(root, rel);
   const safeRoot = path.resolve(root);
   if (full !== safeRoot && !full.startsWith(safeRoot + path.sep)) return null;
@@ -163,7 +175,6 @@ function readCuratedFile(id, expectedType) {
   if (!root) return null;
   let rel;
   try { rel = Buffer.from(rest.slice(sep + 1), 'base64url').toString('utf8'); } catch (e) { return null; }
-  if (rel.split('/').includes('memory')) return null;
   const safeRoot = path.resolve(root);
   const full = path.resolve(root, rel);
   if (full !== safeRoot && !full.startsWith(safeRoot + path.sep)) return null;
@@ -194,6 +205,10 @@ router.get('/api/docs', (req, res) => {
         });
       }
     } catch (e) {}
+    for (const d of HISTORICAL_RECORD_FILES) {
+      const item = makeFileEntry({ ...d, type: 'history' });
+      if (item) list.push(item);
+    }
     return sendPage(res, searchDocuments(list, query), req.query.page, req.query.size, query);
   }
 
@@ -232,6 +247,7 @@ function bodyForSearch(item) {
     if (item.id.startsWith('manual-file-')) return readCuratedFile(item.id, 'manual') || '';
     if (item.id.startsWith('team-file-')) return readCuratedFile(item.id, 'team') || '';
     if (item.id.startsWith('archive-file-')) return readCuratedFile(item.id, 'archive') || '';
+    if (item.id.startsWith('history-file-')) return readCuratedFile(item.id, 'history') || '';
     if (item.id.startsWith('memory-')) {
       const name = item.id.slice('memory-'.length);
       if (!/^[^/\\]+$/.test(name)) return '';
@@ -308,6 +324,11 @@ router.get('/api/docs/:id', (req, res) => {
     if (id.startsWith('archive-file-')) {
       const body = readCuratedFile(id, 'archive');
       if (body == null) return res.status(404).json({ ok: false, error: 'archive file not found' });
+      return res.json({ ok: true, id, body });
+    }
+    if (id.startsWith('history-file-')) {
+      const body = readCuratedFile(id, 'history');
+      if (body == null) return res.status(404).json({ ok: false, error: 'history file not found' });
       return res.json({ ok: true, id, body });
     }
     if (id.startsWith('memory-')) {
